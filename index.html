@@ -447,11 +447,25 @@ function stopTilt(){if(_tiltH){window.removeEventListener('deviceorientation',_t
 function applyTiltToFrame(){
   const frame=document.getElementById('printFrame');
   if(!frame)return;
-  // gamma: side tilt → rotateY. Clamp for subtle effect
-  const ry=Math.max(-50,Math.min(50,_curGamma*0.6));
-  // beta near 90 = pointing at wall. Deviation from 90 → rotateX
-  const rx=Math.max(-30,Math.min(30,(_curBeta-90)*0.4));
-  frame.style.transform=`rotate(${S.frameRotation}deg) perspective(700px) rotateY(${ry}deg) rotateX(${rx}deg)`;
+  // Determine phone orientation from screen dimensions
+  const isLandscape = window.innerWidth > window.innerHeight;
+  // When phone points at a wall in portrait:
+  //   beta ≈ 90  (screen facing forward)
+  //   gamma = side-to-side tilt of wall → rotateY on the overlay
+  //   (beta-90) = up/down tilt of wall → rotateX on the overlay
+  // Signs: positive gamma = phone tilts right → wall goes right → rotateY should be positive
+  //        (beta-90) > 0 = phone tilts forward → top of wall further → rotateX negative
+  let ry, rx;
+  if(!isLandscape){
+    // Portrait — standard axes
+    ry = Math.max(-60, Math.min(60, _curGamma * 0.7));
+    rx = Math.max(-40, Math.min(40, -(_curBeta - 90) * 0.5));
+  } else {
+    // Landscape — axes swap: gamma becomes up/down, beta encodes side tilt
+    ry = Math.max(-60, Math.min(60, -(_curBeta - 90) * 0.7));
+    rx = Math.max(-40, Math.min(40, _curGamma * 0.5));
+  }
+  frame.style.transform=`rotate(${S.frameRotation}deg) perspective(800px) rotateY(${ry}deg) rotateX(${rx}deg)`;
 }
 
 function showDistWarn(){
