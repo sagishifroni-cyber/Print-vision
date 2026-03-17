@@ -1105,19 +1105,51 @@ function recalibrate() { setupCalibration(); }
 function initFrame() {
   const overlay    = document.getElementById('photo-overlay');
   const overlayImg = document.getElementById('overlayImg');
-  overlayImg.src = state.imageSrc;
-  // apply image rotation from setup
-  overlayImg.style.transform = `rotate(${state.imageRotation}deg)`;
-  state.frameRotation = 0;
+
+  // "אפייה" של הסיבוב מהגדרות לתוך התמונה עצמה על canvas
+  // כך ה-img תמיד ממלא את המסגרת בדיוק, ללא CSS rotate שגורם לחיתוך
+  function setFrameWithSrc(src) {
+    overlayImg.style.transform = '';
+    overlayImg.src = src;
+    state.frameRotation = 0;
+    state.frameW = state.printW * state.pxPerCm;
+    state.frameH = state.printH * state.pxPerCm;
+    state.frameX = overlay.clientWidth  / 2 - state.frameW / 2;
+    state.frameY = overlay.clientHeight / 2 - state.frameH / 2;
+    applyFrame();
+    setupDrag();
+    setupSliders();
+  }
+
+  if (state.imageRotation === 0) {
+    setFrameWithSrc(state.imageSrc);
+    return;
+  }
+
+  // סובב את התמונה על canvas לפי state.imageRotation
+  const img = new Image();
+  img.onload = () => {
+    const rad = state.imageRotation * Math.PI / 180;
+    const isSwapped = state.imageRotation % 180 === 90;
+    const canvas = document.createElement('canvas');
+    canvas.width  = isSwapped ? img.height : img.width;
+    canvas.height = isSwapped ? img.width  : img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    state.imageSrc = canvas.toDataURL('image/jpeg', 0.95);
+    state.imageRotation = 0; // כבר אפוי
+    setFrameWithSrc(state.imageSrc);
+  };
+  img.src = state.imageSrc;
+  return; // setFrameWithSrc יקרא async
 
   state.frameW = state.printW * state.pxPerCm;
   state.frameH = state.printH * state.pxPerCm;
   state.frameX = overlay.clientWidth  / 2 - state.frameW / 2;
   state.frameY = overlay.clientHeight / 2 - state.frameH / 2;
 
-  applyFrame();
-  setupDrag();
-  setupSliders();
 }
 
 function applyFrame() {
@@ -1141,17 +1173,39 @@ function updateHUD() {
 }
 
 // שיפור 1 (בזמן אמת): סיבוב תמונה על הoverlay
+// במקום CSS rotate (שגורם לחיתוך), אנחנו מרנדרים את התמונה המסובבת על canvas
+// ומשתמשים בה כ-src חדש — כך המסגרת תמיד מתאימה בדיוק לתמונה
 function rotateImageFrame() {
-  state.frameRotation = (state.frameRotation + 90) % 360;
-  // when rotated 90/270 swap display dims so frame fits correctly
-  if (state.frameRotation % 180 === 90) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    // אחרי סיבוב 90°, רוחב וגובה מתחלפים
+    canvas.width  = img.height;
+    canvas.height = img.width;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(90 * Math.PI / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    const rotatedSrc = canvas.toDataURL('image/jpeg', 0.95);
+
+    // עדכון state
+    state.imageSrc    = rotatedSrc;
+    state.imageAspect = img.height / img.width; // aspect מתהפך
+
+    // החלף מימדי המסגרת
     [state.frameW, state.frameH] = [state.frameH, state.frameW];
     [state.printW, state.printH] = [state.printH, state.printW];
-  }
-  document.getElementById('overlayImg').style.transform = `rotate(${state.frameRotation}deg)`;
-  applyFrame();
-  syncSliders();
-  updateHUD();
+
+    // עדכן את ה-img ב-overlay
+    const overlayImg = document.getElementById('overlayImg');
+    overlayImg.style.transform = '';  // ללא CSS rotate — התמונה עצמה מסובבת
+    overlayImg.src = rotatedSrc;
+
+    applyFrame();
+    syncSliders();
+    updateHUD();
+  };
+  img.src = state.imageSrc;
 }
 
 // ===== DRAG =====
