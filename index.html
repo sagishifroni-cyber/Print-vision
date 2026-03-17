@@ -772,6 +772,11 @@
     <div id="refGuideBox" class="ref-guide-box">
       <span id="refGuideLabel">85.6 × 54 מ"מ</span>
     </div>
+    <!-- סרגל קו לחפץ מותאם -->
+    <div id="refGuideLine" style="display:none; align-items:center; justify-content:center; flex-direction:column; gap:6px;">
+      <div id="refLineEl" style="background:var(--accent2); border-radius:2px;"></div>
+      <span id="refLineLabel" style="font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--accent2);"></span>
+    </div>
 
     <div class="calib-slider-wrap">
       <div class="calib-slider-label">
@@ -997,6 +1002,10 @@ function selectDim(d) {
   document.getElementById('dimBtnW').classList.toggle('active', d === 'w');
   document.getElementById('dimBtnH').classList.toggle('active', d === 'h');
   validateSetup();
+  // עדכן סרגל אם מסך הכיול פתוח
+  if (document.getElementById('calibration-overlay').style.display === 'flex') {
+    updateCalibBox();
+  }
 }
 
 function validateSetup() {
@@ -1066,19 +1075,49 @@ function setupCalibration() {
 function updateCalibBox() {
   const slider = document.getElementById('calibSlider');
   const px = parseInt(slider.value);
-  const box = document.getElementById('refGuideBox');
-  const aspect = state.refWidthMm / state.refHeightMm;
-  const w = px;
-  const h = Math.round(px / aspect);
-  box.style.width  = w + 'px';
-  box.style.height = h + 'px';
-  const ppc = px / (state.refWidthMm / 10);
-  document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
-  // update label text in box
-  document.getElementById('refGuideLabel').textContent =
-    state.refWidthMm >= 100
-      ? `${(state.refWidthMm/10).toFixed(0)} × ${(state.refHeightMm/10).toFixed(0)} ס"מ`
-      : `${state.refWidthMm} × ${state.refHeightMm} מ"מ`;
+  const isCustom = state.refType === 'custom_ref';
+
+  if (isCustom) {
+    // הצג סרגל קו בלבד
+    document.getElementById('refGuideBox').style.display  = 'none';
+    document.getElementById('refGuideLine').style.display = 'flex';
+
+    const dimType = state.refDimType; // 'w' = רוחב → קו אופקי, 'h' = גובה → קו אנכי
+    const line    = document.getElementById('refLineEl');
+    const label   = document.getElementById('refLineLabel');
+    const m       = parseFloat(document.getElementById('refMeasure')?.value) || 0;
+
+    if (dimType === 'w') {
+      line.style.width  = px + 'px';
+      line.style.height = '3px';
+    } else {
+      line.style.width  = '3px';
+      line.style.height = px + 'px';
+    }
+
+    label.textContent = m > 0 ? `${m} ס"מ` : '—';
+    // pxPerCm מבוסס על הציר שנבחר
+    const ppc = px / (m || 1);
+    document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
+
+  } else {
+    // הצג תיבה מלאה לכרטיס / A4
+    document.getElementById('refGuideBox').style.display  = 'flex';
+    document.getElementById('refGuideLine').style.display = 'none';
+
+    const aspect = state.refWidthMm / state.refHeightMm;
+    const w = px;
+    const h = Math.round(px / aspect);
+    const box = document.getElementById('refGuideBox');
+    box.style.width  = w + 'px';
+    box.style.height = h + 'px';
+    const ppc = px / (state.refWidthMm / 10);
+    document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
+    document.getElementById('refGuideLabel').textContent =
+      state.refWidthMm >= 100
+        ? `${(state.refWidthMm/10).toFixed(0)} × ${(state.refHeightMm/10).toFixed(0)} ס"מ`
+        : `${state.refWidthMm} × ${state.refHeightMm} מ"מ`;
+  }
 }
 
 function finishCalibration() {
@@ -1183,18 +1222,20 @@ function rotateImageFrame() {
     state.imageSrc    = rotatedSrc;
     state.imageAspect = img.height / img.width;
 
+    // שמור מרכז המסגרת לפני שינוי הממדים
+    const centerX = state.frameX + state.frameW / 2;
+    const centerY = state.frameY + state.frameH / 2;
+
     // החלף printW/H
     [state.printW, state.printH] = [state.printH, state.printW];
 
-    // חשב מחדש את גודל המסגרת בפיקסלים לפי הממדים החדשים
-    const overlay = document.getElementById('photo-overlay');
+    // חשב מחדש גודל מסגרת
     state.frameW = state.printW * state.pxPerCm;
     state.frameH = state.printH * state.pxPerCm;
-    // שמור על מרכז המסגרת
-    const cx = state.frameX + (state.frameH); // frameH לפני החלפה = frameW אחרי
-    const cy = state.frameY + (state.frameW); // frameW לפני החלפה = frameH אחרי
-    state.frameX = cx - state.frameW / 2;
-    state.frameY = cy - state.frameH / 2;
+
+    // מקם מחדש סביב אותו מרכז
+    state.frameX = centerX - state.frameW / 2;
+    state.frameY = centerY - state.frameH / 2;
 
     const overlayImg = document.getElementById('overlayImg');
     overlayImg.style.transform = '';
