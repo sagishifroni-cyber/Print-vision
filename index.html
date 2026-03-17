@@ -1143,13 +1143,6 @@ function initFrame() {
     setFrameWithSrc(state.imageSrc);
   };
   img.src = state.imageSrc;
-  return; // setFrameWithSrc יקרא async
-
-  state.frameW = state.printW * state.pxPerCm;
-  state.frameH = state.printH * state.pxPerCm;
-  state.frameX = overlay.clientWidth  / 2 - state.frameW / 2;
-  state.frameY = overlay.clientHeight / 2 - state.frameH / 2;
-
 }
 
 function applyFrame() {
@@ -1179,7 +1172,6 @@ function rotateImageFrame() {
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement('canvas');
-    // אחרי סיבוב 90°, רוחב וגובה מתחלפים
     canvas.width  = img.height;
     canvas.height = img.width;
     const ctx = canvas.getContext('2d');
@@ -1188,17 +1180,24 @@ function rotateImageFrame() {
     ctx.drawImage(img, -img.width / 2, -img.height / 2);
     const rotatedSrc = canvas.toDataURL('image/jpeg', 0.95);
 
-    // עדכון state
     state.imageSrc    = rotatedSrc;
-    state.imageAspect = img.height / img.width; // aspect מתהפך
+    state.imageAspect = img.height / img.width;
 
-    // החלף מימדי המסגרת
-    [state.frameW, state.frameH] = [state.frameH, state.frameW];
+    // החלף printW/H
     [state.printW, state.printH] = [state.printH, state.printW];
 
-    // עדכן את ה-img ב-overlay
+    // חשב מחדש את גודל המסגרת בפיקסלים לפי הממדים החדשים
+    const overlay = document.getElementById('photo-overlay');
+    state.frameW = state.printW * state.pxPerCm;
+    state.frameH = state.printH * state.pxPerCm;
+    // שמור על מרכז המסגרת
+    const cx = state.frameX + (state.frameH); // frameH לפני החלפה = frameW אחרי
+    const cy = state.frameY + (state.frameW); // frameW לפני החלפה = frameH אחרי
+    state.frameX = cx - state.frameW / 2;
+    state.frameY = cy - state.frameH / 2;
+
     const overlayImg = document.getElementById('overlayImg');
-    overlayImg.style.transform = '';  // ללא CSS rotate — התמונה עצמה מסובבת
+    overlayImg.style.transform = '';
     overlayImg.src = rotatedSrc;
 
     applyFrame();
