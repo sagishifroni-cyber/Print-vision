@@ -8,605 +8,140 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d0d0f;
-    --surface: #16161a;
-    --surface2: #1e1e24;
-    --border: #2a2a35;
-    --accent: #e8c97a;
-    --accent2: #7ac9e8;
-    --text: #f0ede8;
-    --text-muted: #7a7a8a;
-    --danger: #e87a7a;
-    --success: #7ae8a0;
-    --overlay-color: rgba(232, 201, 122, 0.18);
-    --overlay-border: rgba(232, 201, 122, 0.7);
+    --bg: #0d0d0f; --surface: #16161a; --surface2: #1e1e24; --border: #2a2a35;
+    --accent: #e8c97a; --accent2: #7ac9e8; --text: #f0ede8; --text-muted: #7a7a8a;
+    --danger: #e87a7a; --success: #7ae8a0; --overlay-border: rgba(232,201,122,0.7);
   }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Heebo',sans-serif; background:var(--bg); color:var(--text); height:100dvh; overflow:hidden; display:flex; flex-direction:column; }
+  .screen { display:none; flex-direction:column; height:100dvh; overflow:hidden; }
+  .screen.active { display:flex; }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* WELCOME */
+  #welcome { align-items:center; justify-content:center; gap:2rem; padding:2rem; background:radial-gradient(ellipse at 30% 20%,#1a1a2e 0%,var(--bg) 60%); }
+  .logo { font-family:'Space Mono',monospace; font-size:1.1rem; letter-spacing:0.3em; color:var(--accent); text-transform:uppercase; opacity:0; animation:fadeUp 0.6s ease forwards 0.2s; }
+  .welcome-title { font-size:clamp(2rem,8vw,3.5rem); font-weight:700; text-align:center; line-height:1.15; opacity:0; animation:fadeUp 0.6s ease forwards 0.4s; }
+  .welcome-title span { color:var(--accent); }
+  .welcome-sub { font-size:1rem; color:var(--text-muted); text-align:center; max-width:320px; line-height:1.7; opacity:0; animation:fadeUp 0.6s ease forwards 0.6s; }
+  .btn-primary { background:var(--accent); color:#0d0d0f; border:none; padding:1rem 2.5rem; font-family:'Heebo',sans-serif; font-size:1.1rem; font-weight:700; border-radius:4px; cursor:pointer; transition:transform 0.15s,box-shadow 0.15s; opacity:0; animation:fadeUp 0.6s ease forwards 0.8s; }
+  .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(232,201,122,0.3); }
 
-  body {
-    font-family: 'Heebo', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100dvh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
+  /* SETUP */
+  #setup { overflow-y:auto; padding:1.5rem 1.5rem 6rem; gap:1.5rem; }
+  .setup-header { display:flex; align-items:center; gap:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border); }
+  .back-btn { background:none; border:1px solid var(--border); color:var(--text-muted); width:36px; height:36px; border-radius:4px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:border-color 0.2s,color 0.2s; flex-shrink:0; }
+  .back-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .setup-title { font-size:1.3rem; font-weight:700; }
+  .steps { display:flex; gap:0.5rem; align-items:center; }
+  .step-dot { width:8px; height:8px; border-radius:50%; background:var(--border); transition:background 0.3s,transform 0.3s; }
+  .step-dot.active { background:var(--accent); transform:scale(1.3); }
+  .step-dot.done { background:var(--success); }
+  .section-label { font-family:'Space Mono',monospace; font-size:0.65rem; letter-spacing:0.2em; color:var(--accent); text-transform:uppercase; margin-bottom:0.75rem; }
 
-  /* ===== SCREENS ===== */
-  .screen {
-    display: none;
-    flex-direction: column;
-    height: 100dvh;
-    overflow: hidden;
-  }
-  .screen.active { display: flex; }
+  .upload-zone { border:2px dashed var(--border); border-radius:8px; padding:2rem; text-align:center; cursor:pointer; transition:border-color 0.2s,background 0.2s; position:relative; overflow:hidden; }
+  .upload-zone:hover { border-color:var(--accent); background:rgba(232,201,122,0.04); }
+  .upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .upload-zone .upload-icon { font-size:2.5rem; margin-bottom:0.5rem; }
+  .upload-zone p { color:var(--text-muted); font-size:0.9rem; }
+  .upload-zone.has-image { border-style:solid; border-color:var(--success); }
+  .upload-preview { width:100%; max-height:160px; object-fit:contain; border-radius:4px; display:none; margin-top:0.5rem; }
+  .upload-preview.visible { display:block; }
 
-  /* ===== WELCOME SCREEN ===== */
-  #welcome {
-    align-items: center;
-    justify-content: center;
-    gap: 2rem;
-    padding: 2rem;
-    background: radial-gradient(ellipse at 30% 20%, #1a1a2e 0%, var(--bg) 60%);
-  }
+  .size-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; }
+  .size-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:0.6rem 0.4rem; border-radius:6px; cursor:pointer; font-family:'Heebo',sans-serif; font-size:0.8rem; text-align:center; transition:border-color 0.2s,background 0.2s,color 0.2s; line-height:1.3; }
+  .size-btn:hover { border-color:var(--accent2); }
+  .size-btn.active { border-color:var(--accent); background:rgba(232,201,122,0.1); color:var(--accent); }
+  .size-btn .size-dims { font-size:0.7rem; color:var(--text-muted); display:block; }
+  .size-btn.active .size-dims { color:var(--accent); opacity:0.7; }
 
-  .logo {
-    font-family: 'Space Mono', monospace;
-    font-size: 1.1rem;
-    letter-spacing: 0.3em;
-    color: var(--accent);
-    text-transform: uppercase;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.2s;
-  }
+  .custom-size-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:0.5rem; margin-top:0.75rem; }
+  .custom-input-wrap { display:flex; flex-direction:column; gap:0.3rem; }
+  .custom-input-wrap label { font-size:0.75rem; color:var(--text-muted); }
+  .custom-input { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:0.6rem 0.75rem; border-radius:6px; font-family:'Heebo',sans-serif; font-size:0.9rem; text-align:center; width:100%; transition:border-color 0.2s; }
+  .custom-input:focus { outline:none; border-color:var(--accent); }
+  .custom-input::placeholder { color:var(--text-muted); }
+  .lock-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); width:36px; height:36px; border-radius:6px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:all 0.2s; margin-top:1.2rem; }
+  .lock-btn.locked { border-color:var(--accent); color:var(--accent); background:rgba(232,201,122,0.08); }
 
-  .welcome-title {
-    font-size: clamp(2rem, 8vw, 3.5rem);
-    font-weight: 700;
-    text-align: center;
-    line-height: 1.15;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.4s;
-  }
-  .welcome-title span { color: var(--accent); }
+  .ref-cards { display:grid; grid-template-columns:repeat(2,1fr); gap:0.6rem; }
+  .ref-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.85rem; cursor:pointer; transition:border-color 0.2s,background 0.2s; display:flex; align-items:center; gap:0.6rem; }
+  .ref-card:hover { border-color:var(--accent2); }
+  .ref-card.active { border-color:var(--accent); background:rgba(232,201,122,0.07); }
+  .ref-card .ref-icon { font-size:1.5rem; flex-shrink:0; }
+  .ref-card .ref-text { font-size:0.85rem; font-weight:500; }
+  .ref-card .ref-size { font-size:0.72rem; color:var(--text-muted); }
+  .ref-card.active .ref-size { color:var(--accent); opacity:0.7; }
 
-  .welcome-sub {
-    font-size: 1rem;
-    color: var(--text-muted);
-    text-align: center;
-    max-width: 320px;
-    line-height: 1.7;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.6s;
-  }
+  .ref-rotate-row { display:flex; align-items:center; gap:0.5rem; margin-top:0.5rem; }
+  .rotate-small-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); padding:0.4rem 0.8rem; border-radius:6px; cursor:pointer; font-size:0.8rem; font-family:'Heebo',sans-serif; transition:border-color 0.2s,color 0.2s; }
+  .rotate-small-btn:hover { border-color:var(--accent2); color:var(--accent2); }
 
-  .btn-primary {
-    background: var(--accent);
-    color: #0d0d0f;
-    border: none;
-    padding: 1rem 2.5rem;
-    font-family: 'Heebo', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.8s;
-  }
-  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,201,122,0.3); }
-  .btn-primary:active { transform: translateY(0); }
+  .custom-ref-area { display:none; margin-top:0.6rem; gap:0.5rem; flex-direction:column; }
+  .info-pill { background:rgba(122,201,232,0.12); border:1px solid rgba(122,201,232,0.3); color:var(--accent2); font-size:0.78rem; padding:0.5rem 0.75rem; border-radius:6px; line-height:1.5; margin-top:0.5rem; }
+  .warn-pill { background:rgba(232,201,122,0.1); border:1px solid rgba(232,201,122,0.35); color:var(--accent); font-size:0.78rem; padding:0.5rem 0.75rem; border-radius:6px; line-height:1.5; margin-top:0.5rem; }
 
-  /* ===== SETUP SCREEN ===== */
-  #setup {
-    overflow-y: auto;
-    padding: 1.5rem 1.5rem 6rem;
-    gap: 1.5rem;
-  }
+  .start-btn-wrap { position:fixed; bottom:0; left:0; right:0; padding:1rem 1.5rem; background:linear-gradient(to top,var(--bg) 60%,transparent); }
+  .btn-start { width:100%; background:var(--accent); color:#0d0d0f; border:none; padding:1rem; font-family:'Heebo',sans-serif; font-size:1.1rem; font-weight:700; border-radius:6px; cursor:pointer; transition:opacity 0.2s,transform 0.15s; }
+  .btn-start:disabled { opacity:0.35; cursor:not-allowed; }
+  .btn-start:not(:disabled):hover { transform:translateY(-1px); }
 
-  .setup-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .back-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    width: 36px; height: 36px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: border-color 0.2s, color 0.2s;
-    flex-shrink: 0;
-  }
-  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* CAMERA */
+  #camera-screen { position:relative; background:#000; }
+  #video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 
-  .setup-title {
-    font-size: 1.3rem;
-    font-weight: 700;
-  }
+  #calibration-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.65); z-index:10; gap:1.1rem; padding:2rem; text-align:center; }
+  .calib-title { font-size:1.2rem; font-weight:700; color:var(--accent); }
+  .calib-sub { font-size:0.88rem; color:var(--text-muted); line-height:1.6; }
+  .ref-guide-box { border:2px solid var(--accent2); border-radius:4px; display:flex; align-items:center; justify-content:center; background:rgba(122,201,232,0.08); }
+  .ref-guide-box span { font-size:0.75rem; color:var(--accent2); font-family:'Space Mono',monospace; }
+  .calib-slider-wrap { width:100%; max-width:320px; }
+  .calib-slider-label { display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem; }
+  .calib-slider { width:100%; -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:var(--border); outline:none; }
+  .calib-slider::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--accent2); cursor:pointer; border:2px solid var(--bg); }
+  .calib-btns { display:flex; gap:0.6rem; align-items:center; }
+  .btn-calib-done { background:var(--accent2); color:#0d0d0f; border:none; padding:0.8rem 1.5rem; font-family:'Heebo',sans-serif; font-size:1rem; font-weight:700; border-radius:4px; cursor:pointer; }
+  .btn-calib-rotate { background:rgba(255,255,255,0.1); color:var(--text); border:1px solid var(--border); padding:0.8rem 1rem; font-size:0.9rem; border-radius:4px; cursor:pointer; font-family:'Heebo',sans-serif; }
 
-  /* Step indicators */
-  .steps {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .step-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--border);
-    transition: background 0.3s, transform 0.3s;
-  }
-  .step-dot.active { background: var(--accent); transform: scale(1.3); }
-  .step-dot.done { background: var(--success); }
+  #distance-warning { position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:25; background:rgba(232,201,122,0.15); border:1px solid var(--accent); color:var(--accent); font-size:0.78rem; padding:0.4rem 1rem; border-radius:20px; white-space:nowrap; pointer-events:none; display:none; }
 
-  .section-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-  }
+  #photo-overlay { position:absolute; inset:0; z-index:5; pointer-events:none; }
+  .print-frame { position:absolute; cursor:move; pointer-events:all; touch-action:none; user-select:none; transform-origin:center center; }
+  .print-frame img { width:100%; height:100%; object-fit:cover; display:block; }
+  .frame-border { position:absolute; inset:0; border:2px solid var(--overlay-border); pointer-events:none; }
+  .frame-label { position:absolute; bottom:-26px; left:50%; transform:translateX(-50%); background:rgba(13,13,15,0.8); color:var(--accent); font-family:'Space Mono',monospace; font-size:0.65rem; padding:3px 8px; border-radius:2px; white-space:nowrap; pointer-events:none; }
+  .resize-handle { position:absolute; bottom:-4px; right:-4px; width:22px; height:22px; background:var(--accent); border:2px solid var(--bg); border-radius:2px; cursor:se-resize; pointer-events:all; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d0d0f; }
 
-  /* Image upload */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: 8px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-  .upload-zone:hover { border-color: var(--accent); background: rgba(232,201,122,0.04); }
-  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-  .upload-zone p { color: var(--text-muted); font-size: 0.9rem; }
-  .upload-zone.has-image { border-style: solid; border-color: var(--success); }
-  .upload-preview {
-    width: 100%;
-    max-height: 160px;
-    object-fit: contain;
-    border-radius: 4px;
-    display: none;
-    margin-top: 0.5rem;
-  }
-  .upload-preview.visible { display: block; }
+  .cam-hud-top { position:absolute; top:0; left:0; right:0; z-index:20; display:flex; align-items:center; justify-content:space-between; padding:1rem 1rem 0.5rem; background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent); }
+  .hud-logo { font-family:'Space Mono',monospace; font-size:0.75rem; letter-spacing:0.2em; color:var(--accent); }
+  .hud-size-badge { background:rgba(232,201,122,0.15); border:1px solid var(--overlay-border); color:var(--accent); font-family:'Space Mono',monospace; font-size:0.7rem; padding:0.3rem 0.6rem; border-radius:3px; }
 
-  /* Size selection */
-  .size-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-  }
-  .size-btn {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.6rem 0.4rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-family: 'Heebo', sans-serif;
-    font-size: 0.8rem;
-    text-align: center;
-    transition: border-color 0.2s, background 0.2s, color 0.2s;
-    line-height: 1.3;
-  }
-  .size-btn:hover { border-color: var(--accent2); }
-  .size-btn.active { border-color: var(--accent); background: rgba(232,201,122,0.1); color: var(--accent); }
-  .size-btn .size-dims { font-size: 0.7rem; color: var(--text-muted); display: block; }
-  .size-btn.active .size-dims { color: var(--accent); opacity: 0.7; }
+  .cam-controls { position:absolute; bottom:0; left:0; right:0; z-index:20; padding:0.8rem 1.2rem 1.8rem; background:linear-gradient(to top,rgba(0,0,0,0.85),transparent); display:flex; flex-direction:column; gap:0.6rem; }
+  .ctrl-row { display:flex; align-items:center; gap:0.6rem; }
+  .ctrl-label { font-size:0.72rem; color:var(--text-muted); width:46px; flex-shrink:0; font-family:'Space Mono',monospace; }
+  .size-slider { flex:1; -webkit-appearance:none; appearance:none; height:3px; border-radius:2px; background:rgba(255,255,255,0.2); outline:none; }
+  .size-slider::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--bg); }
+  .ctrl-val { font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--text); width:40px; text-align:left; flex-shrink:0; }
+  .cam-btns { display:flex; gap:0.4rem; }
+  .cam-btn { flex:1; padding:0.6rem 0.3rem; border-radius:6px; border:none; font-family:'Heebo',sans-serif; font-size:0.78rem; font-weight:600; cursor:pointer; transition:transform 0.15s; }
+  .cam-btn:active { transform:scale(0.96); }
+  .cam-btn.secondary { background:rgba(255,255,255,0.1); color:var(--text); border:1px solid var(--border); }
+  .cam-btn.primary { background:var(--accent); color:#0d0d0f; }
+  .cam-btn.danger { background:var(--danger); color:#fff; }
+  .cam-btn.rotate-btn { background:rgba(122,201,232,0.15); color:var(--accent2); border:1px solid rgba(122,201,232,0.35); }
 
-  /* Custom size */
-  .custom-size-row {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-  .custom-input-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
-  .custom-input-wrap label { font-size: 0.75rem; color: var(--text-muted); }
-  .custom-input {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.6rem 0.75rem;
-    border-radius: 6px;
-    font-family: 'Heebo', sans-serif;
-    font-size: 0.9rem;
-    text-align: center;
-    width: 100%;
-    transition: border-color 0.2s;
-  }
-  .custom-input:focus { outline: none; border-color: var(--accent); }
-  .custom-input::placeholder { color: var(--text-muted); }
-  .lock-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    width: 36px; height: 36px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    margin-top: 1.2rem;
-  }
-  .lock-btn.locked { border-color: var(--accent); color: var(--accent); background: rgba(232,201,122,0.08); }
+  #captured-screen { position:relative; background:#000; align-items:center; justify-content:center; }
+  #captured-canvas { width:100%; height:100%; object-fit:contain; }
+  .captured-controls { position:absolute; bottom:0; left:0; right:0; padding:1rem 1.5rem 2rem; background:linear-gradient(to top,rgba(0,0,0,0.85),transparent); display:flex; gap:0.8rem; z-index:10; }
+  .captured-controls .cam-btn { flex:1; }
 
-  /* Reference object */
-  .ref-cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.6rem;
-  }
-  .ref-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.85rem;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-  .ref-card:hover { border-color: var(--accent2); }
-  .ref-card.active { border-color: var(--accent); background: rgba(232,201,122,0.07); }
-  .ref-card .ref-icon { font-size: 1.5rem; flex-shrink: 0; }
-  .ref-card .ref-text { font-size: 0.85rem; font-weight: 500; }
-  .ref-card .ref-size { font-size: 0.72rem; color: var(--text-muted); }
-  .ref-card.active .ref-size { color: var(--accent); opacity: 0.7; }
-
-  /* Custom reference */
-  .custom-ref-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-end;
-    margin-top: 0.6rem;
-  }
-  .custom-ref-row .custom-input-wrap { flex: 1; }
-
-  /* Start button */
-  .start-btn-wrap {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    padding: 1rem 1.5rem;
-    background: linear-gradient(to top, var(--bg) 60%, transparent);
-  }
-  .btn-start {
-    width: 100%;
-    background: var(--accent);
-    color: #0d0d0f;
-    border: none;
-    padding: 1rem;
-    font-family: 'Heebo', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s;
-  }
-  .btn-start:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-start:not(:disabled):hover { transform: translateY(-1px); }
-
-  /* ===== AR CAMERA SCREEN ===== */
-  #camera-screen {
-    position: relative;
-    background: #000;
-  }
-
-  #video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  /* Calibration overlay */
-  #calibration-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.65);
-    z-index: 10;
-    gap: 1.5rem;
-    padding: 2rem;
-    text-align: center;
-  }
-  .calib-title { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
-  .calib-sub { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
-
-  .ref-guide-box {
-    border: 2px solid var(--accent2);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(122, 201, 232, 0.08);
-    position: relative;
-  }
-  .ref-guide-box span { font-size: 0.75rem; color: var(--accent2); font-family: 'Space Mono', monospace; }
-
-  .calib-slider-wrap { width: 100%; max-width: 320px; }
-  .calib-slider-label {
-    display: flex; justify-content: space-between;
-    font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;
-  }
-  .calib-slider {
-    width: 100%;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-    outline: none;
-  }
-  .calib-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background: var(--accent2);
-    cursor: pointer;
-    border: 2px solid var(--bg);
-  }
-
-  .btn-calib-done {
-    background: var(--accent2);
-    color: #0d0d0f;
-    border: none;
-    padding: 0.8rem 2rem;
-    font-family: 'Heebo', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  /* Photo overlay */
-  #photo-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .print-frame {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: move;
-    pointer-events: all;
-    touch-action: none;
-    user-select: none;
-  }
-
-  .print-frame img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .frame-border {
-    position: absolute;
-    inset: 0;
-    border: 2px solid var(--overlay-border);
-    pointer-events: none;
-  }
-
-  .frame-label {
-    position: absolute;
-    bottom: -28px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(13,13,15,0.8);
-    color: var(--accent);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    padding: 3px 8px;
-    border-radius: 2px;
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
-  .resize-handle {
-    position: absolute;
-    bottom: -4px; right: -4px;
-    width: 20px; height: 20px;
-    background: var(--accent);
-    border: 2px solid var(--bg);
-    border-radius: 2px;
-    cursor: se-resize;
-    pointer-events: all;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px;
-    color: #0d0d0f;
-  }
-
-  /* Top HUD */
-  .cam-hud-top {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1rem 0.5rem;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
-  }
-  .hud-logo {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-  }
-  .hud-size-badge {
-    background: rgba(232,201,122,0.15);
-    border: 1px solid var(--overlay-border);
-    color: var(--accent);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.7rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 3px;
-  }
-
-  /* Bottom controls */
-  .cam-controls {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    z-index: 20;
-    padding: 1rem 1.5rem 2rem;
-    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-  }
-
-  .ctrl-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-  .ctrl-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    width: 50px;
-    flex-shrink: 0;
-    font-family: 'Space Mono', monospace;
-  }
-
-  .size-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.2);
-    outline: none;
-  }
-  .size-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    border: 2px solid var(--bg);
-  }
-
-  .ctrl-val {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--text);
-    width: 42px;
-    text-align: left;
-    flex-shrink: 0;
-  }
-
-  .cam-btns {
-    display: flex;
-    gap: 0.6rem;
-    justify-content: center;
-  }
-
-  .cam-btn {
-    flex: 1;
-    padding: 0.7rem;
-    border-radius: 6px;
-    border: none;
-    font-family: 'Heebo', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s;
-  }
-  .cam-btn:active { transform: scale(0.96); }
-  .cam-btn.secondary {
-    background: rgba(255,255,255,0.1);
-    color: var(--text);
-    border: 1px solid var(--border);
-    flex: 0.6;
-  }
-  .cam-btn.primary {
-    background: var(--accent);
-    color: #0d0d0f;
-  }
-  .cam-btn.danger {
-    background: var(--danger);
-    color: #fff;
-    flex: 0.6;
-  }
-
-  /* Captured photo screen */
-  #captured-screen {
-    position: relative;
-    background: #000;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #captured-canvas {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  .captured-controls {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    padding: 1rem 1.5rem 2rem;
-    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
-    display: flex;
-    gap: 0.8rem;
-    z-index: 10;
-  }
-  .captured-controls .cam-btn { flex: 1; }
-
-  /* ===== ANIMATIONS ===== */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Info tooltip */
-  .info-pill {
-    background: rgba(122, 201, 232, 0.12);
-    border: 1px solid rgba(122, 201, 232, 0.3);
-    color: var(--accent2);
-    font-size: 0.78rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    line-height: 1.5;
-    margin-top: 0.5rem;
-  }
-
-  /* Scrollbar */
-  #setup::-webkit-scrollbar { width: 4px; }
-  #setup::-webkit-scrollbar-track { background: transparent; }
-  #setup::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  #setup::-webkit-scrollbar { width:4px; }
+  #setup::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 </style>
 </head>
 <body>
 
-<!-- ===== WELCOME ===== -->
+<!-- WELCOME -->
 <div id="welcome" class="screen active">
   <div class="logo">PrintVision</div>
   <h1 class="welcome-title">תראה את התמונה<br><span>על הקיר שלך</span></h1>
@@ -614,7 +149,7 @@
   <button class="btn-primary" onclick="goToSetup()">בואו נתחיל ←</button>
 </div>
 
-<!-- ===== SETUP ===== -->
+<!-- SETUP -->
 <div id="setup" class="screen">
   <div class="setup-header">
     <button class="back-btn" onclick="goToWelcome()">←</button>
@@ -626,20 +161,15 @@
     </div>
   </div>
 
-  <!-- Step 1: Upload image -->
   <div>
     <div class="section-label">שלב 1 — תמונה</div>
     <div class="upload-zone" id="uploadZone">
       <input type="file" accept="image/*" id="imageInput" onchange="handleImageUpload(event)">
-      <div id="uploadContent">
-        <div class="upload-icon">🖼️</div>
-        <p>לחץ להעלאת תמונה<br><small>JPG, PNG, WEBP</small></p>
-      </div>
+      <div id="uploadContent"><div class="upload-icon">🖼️</div><p>לחץ להעלאת תמונה<br><small>JPG, PNG, WEBP</small></p></div>
       <img id="uploadPreview" class="upload-preview" alt="preview">
     </div>
   </div>
 
-  <!-- Step 2: Print size -->
   <div>
     <div class="section-label">שלב 2 — גודל הדפסה</div>
     <div class="size-grid">
@@ -650,64 +180,69 @@
       <button class="size-btn" onclick="selectSize('30x40')" data-size="30x40">30×40<span class="size-dims">ס"מ</span></button>
       <button class="size-btn" onclick="selectSize('50x70')" data-size="50x70">50×70<span class="size-dims">ס"מ</span></button>
     </div>
-
     <div style="margin-top:0.75rem;">
       <div class="section-label" style="margin-bottom:0.5rem;">או הזן גודל מותאם</div>
       <div class="custom-size-row">
         <div class="custom-input-wrap">
           <label>רוחב (ס"מ)</label>
-          <input class="custom-input" type="number" id="customW" placeholder="30" min="5" max="200" oninput="onCustomSize()">
+          <input class="custom-input" type="number" id="customW" placeholder="30" min="5" max="200" oninput="onCustomSize('w')">
         </div>
         <button class="lock-btn locked" id="lockBtn" onclick="toggleLock()" title="נעל פרופורציה">🔒</button>
         <div class="custom-input-wrap">
           <label>גובה (ס"מ)</label>
-          <input class="custom-input" type="number" id="customH" placeholder="40" min="5" max="200" oninput="onCustomSize()">
+          <input class="custom-input" type="number" id="customH" placeholder="40" min="5" max="200" oninput="onCustomSize('h')">
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Step 3: Reference object -->
   <div>
     <div class="section-label">שלב 3 — חפץ ייחוס לכיול</div>
     <div class="ref-cards">
       <div class="ref-card active" id="ref-card" onclick="selectRef('card')">
         <span class="ref-icon">💳</span>
-        <div>
-          <div class="ref-text">כרטיס אשראי</div>
-          <div class="ref-size">85.6 × 54 מ"מ</div>
-        </div>
+        <div><div class="ref-text">כרטיס אשראי</div><div class="ref-size">85.6 × 54 מ"מ</div></div>
       </div>
       <div class="ref-card" id="ref-a4" onclick="selectRef('a4')">
         <span class="ref-icon">📄</span>
-        <div>
-          <div class="ref-text">דף A4</div>
-          <div class="ref-size">210 × 297 מ"מ</div>
-        </div>
+        <div><div class="ref-text">דף A4</div><div class="ref-size">210 × 297 מ"מ</div></div>
       </div>
-      <div class="ref-card" onclick="selectRef('custom_ref')" id="ref-custom" style="grid-column:span 2;">
+      <div class="ref-card" id="ref-custom_ref" onclick="selectRef('custom_ref')" style="grid-column:span 2;">
         <span class="ref-icon">📐</span>
-        <div style="flex:1;">
-          <div class="ref-text">חפץ מותאם</div>
-          <div class="ref-size">הזן את גודל החפץ</div>
-        </div>
+        <div style="flex:1;"><div class="ref-text">חפץ מותאם</div><div class="ref-size">הזן מידה אחת בלבד</div></div>
       </div>
     </div>
-    <div id="custom-ref-input" style="display:none; margin-top:0.6rem;">
-      <div class="custom-ref-row">
-        <div class="custom-input-wrap">
-          <label>שם החפץ (אופציונלי)</label>
-          <input class="custom-input" type="text" id="refName" placeholder='למשל: ספה'>
-        </div>
-        <div class="custom-input-wrap" style="max-width:100px;">
-          <label>אורך (ס"מ)</label>
+
+    <!-- Rotate ref (for card / a4) -->
+    <div class="ref-rotate-row" id="refRotateRow">
+      <span style="font-size:0.8rem;color:var(--text-muted);">כיוון החפץ:</span>
+      <button class="rotate-small-btn" onclick="rotateRef()">↻ סובב 90°</button>
+      <span style="font-size:0.8rem;color:var(--text-muted);" id="refOrientLabel">רוחבי</span>
+    </div>
+
+    <!-- Custom ref -->
+    <div class="custom-ref-area" id="custom-ref-input">
+      <div class="custom-input-wrap">
+        <label>שם החפץ (אופציונלי)</label>
+        <input class="custom-input" type="text" id="refName" placeholder="למשל: ספה">
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <div class="custom-input-wrap" style="flex:1;">
+          <label id="refDimLabel">מידה (ס"מ)</label>
           <input class="custom-input" type="number" id="refLength" placeholder="160" min="1" max="1000" oninput="validateSetup()">
         </div>
+        <div class="custom-input-wrap" style="width:100px;">
+          <label>רוחב / גובה</label>
+          <select class="custom-input" id="refDimType" style="padding:0.55rem 0.4rem;" onchange="validateSetup()">
+            <option value="width">רוחב</option>
+            <option value="height">גובה</option>
+          </select>
+        </div>
       </div>
     </div>
-    <div class="info-pill">
-      📍 לפני הצילום, הנח את החפץ שבחרת מול המצלמה כדי שנוכל לכייל את הגודל האמיתי.
-    </div>
+
+    <div class="info-pill">📍 הנח את החפץ מול המצלמה לפני הכיול.</div>
+    <div class="warn-pill">⚠️ שמור על אותו מרחק מהקיר לאורך כל הצילום. התקרבת או התרחקת? כייל מחדש.</div>
   </div>
 
   <div class="start-btn-wrap">
@@ -715,48 +250,41 @@
   </div>
 </div>
 
-<!-- ===== CAMERA SCREEN ===== -->
+<!-- CAMERA -->
 <div id="camera-screen" class="screen">
   <video id="video" autoplay playsinline muted></video>
 
-  <!-- Calibration overlay -->
   <div id="calibration-overlay">
     <div class="calib-title">כיול גודל</div>
-    <p class="calib-sub" id="calibSubText">כוון את <strong id="refNameDisplay">כרטיס האשראי</strong> שלך לתוך המסגרת המסומנת, ואחר כך גרור את הסליידר עד שגודל המסגרת תואם את גודל החפץ.</p>
-
-    <div id="refGuideBox" class="ref-guide-box">
-      <span id="refGuideLabel">85.6 × 54 מ"מ</span>
-    </div>
-
+    <p class="calib-sub">כוון את <strong id="refNameDisplay">כרטיס האשראי</strong> לתוך המסגרת וגרור את הסליידר עד שהמסגרת תואמת את גודל החפץ.</p>
+    <div id="refGuideBox" class="ref-guide-box"><span id="refGuideLabel">85.6 × 54 מ"מ</span></div>
     <div class="calib-slider-wrap">
-      <div class="calib-slider-label">
-        <span>קטן יותר</span>
-        <span id="calibPxLabel">—</span>
-        <span>גדול יותר</span>
-      </div>
-      <input type="range" class="calib-slider" id="calibSlider" min="30" max="400" value="120" oninput="updateCalibBox()">
+      <div class="calib-slider-label"><span>קטן</span><span id="calibPxLabel">—</span><span>גדול</span></div>
+      <input type="range" class="calib-slider" id="calibSlider" min="30" max="500" value="120" oninput="updateCalibBox()">
     </div>
-
-    <button class="btn-calib-done" onclick="finishCalibration()">✓ הגדלים תואמים — המשך</button>
+    <div class="calib-btns">
+      <button class="btn-calib-rotate" onclick="rotateCalibRef()" id="calibRotateBtn">↻ סובב</button>
+      <button class="btn-calib-done" onclick="finishCalibration()">✓ הגדלים תואמים</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">⚠️ שמור על אותו מרחק מהקיר לאורך כל הצילום</p>
   </div>
 
-  <!-- Print frame overlay -->
+  <div id="distance-warning">↕ שינוי מרחק זוהה — מומלץ לכייל מחדש</div>
+
   <div id="photo-overlay">
     <div class="print-frame" id="printFrame">
-      <img id="overlayImg" alt="print preview">
+      <img id="overlayImg" alt="">
       <div class="frame-border"></div>
       <div class="frame-label" id="frameLabel">—</div>
       <div class="resize-handle" id="resizeHandle">↙</div>
     </div>
   </div>
 
-  <!-- Top HUD -->
   <div class="cam-hud-top">
     <div class="hud-logo">PrintVision</div>
     <div class="hud-size-badge" id="hudSizeBadge">—</div>
   </div>
 
-  <!-- Controls -->
   <div class="cam-controls" id="camControls" style="display:none;">
     <div class="ctrl-row">
       <span class="ctrl-label">רוחב</span>
@@ -769,14 +297,15 @@
       <span class="ctrl-val" id="valH">40cm</span>
     </div>
     <div class="cam-btns">
-      <button class="cam-btn secondary" onclick="goToSetup()">⚙ הגדרות</button>
+      <button class="cam-btn secondary" onclick="goToSetup()">⚙</button>
+      <button class="cam-btn rotate-btn" onclick="rotatePrintFrame()">↻ סובב</button>
       <button class="cam-btn primary" onclick="capturePhoto()">📸 צלם</button>
       <button class="cam-btn danger" onclick="recalibrate()">⟳ כייל</button>
     </div>
   </div>
 </div>
 
-<!-- ===== CAPTURED ===== -->
+<!-- CAPTURED -->
 <div id="captured-screen" class="screen">
   <canvas id="captured-canvas"></canvas>
   <div class="captured-controls">
@@ -787,451 +316,289 @@
 </div>
 
 <script>
-// ===== STATE =====
-const state = {
-  imageFile: null,
-  imageSrc: null,
-  imageAspect: 1,
-  printW: null,   // cm
-  printH: null,   // cm
-  refType: 'card',
-  refWidthMm: 85.6,
-  refHeightMm: 54,
-  refName: 'כרטיס האשראי',
-  // calibration
-  pxPerCm: null,
-  calibrated: false,
-  // frame
-  frameW: 0,
-  frameH: 0,
-  frameX: 0,
-  frameY: 0,
-  locked: true,
-  stream: null,
+const S = {
+  imageSrc:null, imageAspect:1,
+  printW:null, printH:null,
+  refType:'card', refWidthMm:85.6, refHeightMm:54, refName:'כרטיס האשראי',
+  refCalib1Dmm:null, refCalib1Dtype:'width',
+  pxPerCm:null, calibrated:false,
+  frameW:0, frameH:0, frameX:0, frameY:0, frameRotation:0,
+  locked:true, stream:null,
+  lastBeta:null,
 };
 
-const SIZES = {
-  '10x15': [10, 15],
-  'A4': [21, 29.7],
-  'A3': [29.7, 42],
-  '20x30': [20, 30],
-  '30x40': [30, 40],
-  '50x70': [50, 70],
-};
+const SIZES = {'10x15':[10,15],'A4':[21,29.7],'A3':[29.7,42],'20x30':[20,30],'30x40':[30,40],'50x70':[50,70]};
 
-// ===== SCREEN NAVIGATION =====
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-function goToWelcome() {
-  stopCamera();
-  showScreen('welcome');
-}
-function goToSetup() {
-  stopCamera();
-  showScreen('setup');
-}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function goToWelcome(){stopCamera();showScreen('welcome');}
+function goToSetup(){stopCamera();showScreen('setup');}
 
-// ===== SETUP =====
-function handleImageUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  state.imageFile = file;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    state.imageSrc = ev.target.result;
-    const img = new Image();
-    img.onload = () => {
-      state.imageAspect = img.width / img.height;
-      document.getElementById('uploadPreview').src = state.imageSrc;
+// SETUP
+function handleImageUpload(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    S.imageSrc=ev.target.result;
+    const img=new Image();
+    img.onload=()=>{
+      S.imageAspect=img.width/img.height;
+      document.getElementById('uploadPreview').src=S.imageSrc;
       document.getElementById('uploadPreview').classList.add('visible');
       document.getElementById('uploadZone').classList.add('has-image');
-      document.getElementById('uploadContent').style.display = 'none';
-      dot(2);
-      validateSetup();
+      document.getElementById('uploadContent').style.display='none';
+      dot(2); validateSetup();
     };
-    img.src = state.imageSrc;
+    img.src=S.imageSrc;
   };
   reader.readAsDataURL(file);
 }
 
-function selectSize(key) {
-  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+function selectSize(key){
+  document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector(`[data-size="${key}"]`).classList.add('active');
-  const [w, h] = SIZES[key];
-  state.printW = w;
-  state.printH = h;
-  document.getElementById('customW').value = w;
-  document.getElementById('customH').value = h;
-  dot(3);
+  [S.printW,S.printH]=SIZES[key];
+  document.getElementById('customW').value=S.printW;
+  document.getElementById('customH').value=S.printH;
+  dot(3); validateSetup();
+}
+
+function onCustomSize(which){
+  document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));
+  const w=parseFloat(document.getElementById('customW').value);
+  const h=parseFloat(document.getElementById('customH').value);
+  if(S.locked&&S.imageSrc){
+    if(which==='w'&&w){const nh=parseFloat((w/S.imageAspect).toFixed(1));document.getElementById('customH').value=nh;S.printW=w;S.printH=nh;}
+    else if(which==='h'&&h){const nw=parseFloat((h*S.imageAspect).toFixed(1));document.getElementById('customW').value=nw;S.printH=h;S.printW=nw;}
+  } else {S.printW=w||null;S.printH=h||null;}
   validateSetup();
 }
 
-function onCustomSize() {
-  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-  const w = parseFloat(document.getElementById('customW').value);
-  const h = parseFloat(document.getElementById('customH').value);
-  if (state.locked && state.imageSrc) {
-    // lock to image aspect
-    const active = document.activeElement.id;
-    if (active === 'customW' && w) {
-      const newH = (w / state.imageAspect).toFixed(1);
-      document.getElementById('customH').value = newH;
-      state.printW = w; state.printH = parseFloat(newH);
-    } else if (active === 'customH' && h) {
-      const newW = (h * state.imageAspect).toFixed(1);
-      document.getElementById('customW').value = newW;
-      state.printH = h; state.printW = parseFloat(newW);
-    }
-  } else {
-    state.printW = w || null;
-    state.printH = h || null;
+function toggleLock(){
+  S.locked=!S.locked;
+  document.getElementById('lockBtn').classList.toggle('locked',S.locked);
+  document.getElementById('lockBtn').textContent=S.locked?'🔒':'🔓';
+}
+
+function selectRef(type){
+  S.refType=type;
+  document.querySelectorAll('.ref-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('ref-'+type)?.classList.add('active');
+  const isCustom=type==='custom_ref';
+  document.getElementById('custom-ref-input').style.display=isCustom?'flex':'none';
+  document.getElementById('refRotateRow').style.display=isCustom?'none':'flex';
+  if(type==='card'){S.refWidthMm=85.6;S.refHeightMm=54;S.refName='כרטיס האשראי';}
+  else if(type==='a4'){S.refWidthMm=210;S.refHeightMm=297;S.refName='דף A4';}
+  updateRefOrientLabel(); validateSetup();
+}
+
+function rotateRef(){
+  [S.refWidthMm,S.refHeightMm]=[S.refHeightMm,S.refWidthMm];
+  updateRefOrientLabel();
+}
+
+function updateRefOrientLabel(){
+  const el=document.getElementById('refOrientLabel');
+  if(el) el.textContent=S.refWidthMm>=S.refHeightMm?'רוחבי':'אנכי';
+}
+
+function validateSetup(){
+  const hasImage=!!S.imageSrc;
+  const hasSize=!!(S.printW&&S.printH);
+  let hasRef=S.refType!=='custom_ref';
+  if(S.refType==='custom_ref'){
+    const l=parseFloat(document.getElementById('refLength').value);
+    const dtype=document.getElementById('refDimType').value;
+    if(l>0){S.refCalib1Dmm=l*10;S.refCalib1Dtype=dtype;hasRef=true;}
+    S.refName=document.getElementById('refName').value.trim()||'החפץ';
   }
-  validateSetup();
+  document.getElementById('startBtn').disabled=!(hasImage&&hasSize&&hasRef);
 }
 
-function toggleLock() {
-  state.locked = !state.locked;
-  const btn = document.getElementById('lockBtn');
-  btn.classList.toggle('locked', state.locked);
-  btn.textContent = state.locked ? '🔒' : '🔓';
-}
+function dot(n){for(let i=1;i<=3;i++){const d=document.getElementById('dot'+i);if(i<n){d.classList.remove('active');d.classList.add('done');}else if(i===n){d.classList.add('active');d.classList.remove('done');}else{d.classList.remove('active','done');}}}
 
-function selectRef(type) {
-  state.refType = type;
-  document.querySelectorAll('.ref-card').forEach(c => c.classList.remove('active'));
-  document.getElementById('ref-' + type)?.classList.add('active');
-  document.getElementById('custom-ref-input').style.display = type === 'custom_ref' ? 'block' : 'none';
-
-  if (type === 'card') {
-    state.refWidthMm = 85.6; state.refHeightMm = 54;
-    state.refName = 'כרטיס האשראי';
-  } else if (type === 'a4') {
-    state.refWidthMm = 210; state.refHeightMm = 297;
-    state.refName = 'דף A4';
-  }
-  validateSetup();
-}
-
-function validateSetup() {
-  const hasImage = !!state.imageSrc;
-  const hasSize = !!(state.printW && state.printH);
-  let hasRef = (state.refType !== 'custom_ref');
-  if (state.refType === 'custom_ref') {
-    const l = parseFloat(document.getElementById('refLength').value);
-    if (l > 0) { state.refWidthMm = l * 10; state.refHeightMm = l * 10 * 0.3; hasRef = true; }
-    const name = document.getElementById('refName').value.trim();
-    state.refName = name || 'החפץ';
-  }
-  document.getElementById('startBtn').disabled = !(hasImage && hasSize && hasRef);
-}
-
-function dot(n) {
-  for (let i = 1; i <= 3; i++) {
-    const d = document.getElementById('dot' + i);
-    if (i < n) { d.classList.remove('active'); d.classList.add('done'); }
-    else if (i === n) { d.classList.add('active'); d.classList.remove('done'); }
-    else { d.classList.remove('active', 'done'); }
-  }
-}
-
-// ===== CAMERA =====
-async function startCamera() {
+// CAMERA
+async function startCamera(){
   showScreen('camera-screen');
-  try {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
-    document.getElementById('video').srcObject = state.stream;
-    setupCalibration();
-  } catch (err) {
-    // fallback to front camera
-    try {
-      state.stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      document.getElementById('video').srcObject = state.stream;
-      setupCalibration();
-    } catch (e) {
-      alert('לא ניתן לגשת למצלמה. אנא אפשר גישה ונסה שנית.');
-      goToSetup();
+  try{S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}});}
+  catch{try{S.stream=await navigator.mediaDevices.getUserMedia({video:true});}catch{alert('לא ניתן לגשת למצלמה.');goToSetup();return;}}
+  document.getElementById('video').srcObject=S.stream;
+  startTilt();
+  setupCalibration();
+}
+function stopCamera(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;}stopTilt();}
+
+// TILT SENSOR
+let _tiltH=null, _distTimer=null, _curGamma=0, _curBeta=90;
+function startTilt(){
+  if(!window.DeviceOrientationEvent)return;
+  _tiltH=e=>{
+    _curGamma=e.gamma||0;
+    _curBeta=e.beta||90;
+    if(S.calibrated) applyTiltToFrame();
+    // Distance warning: beta (forward tilt) should stay ~90 when pointing at wall
+    if(S.calibrated&&S.lastBeta!==null&&Math.abs(_curBeta-S.lastBeta)>15){
+      showDistWarn();
     }
+  };
+  window.addEventListener('deviceorientation',_tiltH);
+}
+function stopTilt(){if(_tiltH){window.removeEventListener('deviceorientation',_tiltH);_tiltH=null;}}
+
+function applyTiltToFrame(){
+  const frame=document.getElementById('printFrame');
+  if(!frame)return;
+  // gamma: side tilt → rotateY. Clamp for subtle effect
+  const ry=Math.max(-50,Math.min(50,_curGamma*0.6));
+  // beta near 90 = pointing at wall. Deviation from 90 → rotateX
+  const rx=Math.max(-30,Math.min(30,(_curBeta-90)*0.4));
+  frame.style.transform=`rotate(${S.frameRotation}deg) perspective(700px) rotateY(${ry}deg) rotateX(${rx}deg)`;
+}
+
+function showDistWarn(){
+  const el=document.getElementById('distance-warning');
+  el.style.display='block';
+  if(_distTimer)clearTimeout(_distTimer);
+  _distTimer=setTimeout(()=>el.style.display='none',3500);
+}
+
+// CALIBRATION
+function setupCalibration(){
+  document.getElementById('calibration-overlay').style.display='flex';
+  document.getElementById('camControls').style.display='none';
+  document.getElementById('printFrame').style.display='none';
+  document.getElementById('refNameDisplay').textContent=S.refName;
+  const isCustom=S.refType==='custom_ref';
+  document.getElementById('calibRotateBtn').style.display=isCustom?'none':'block';
+  if(isCustom){
+    document.getElementById('refGuideLabel').textContent=`${(S.refCalib1Dmm/10).toFixed(0)} ס"מ`;
+  } else {
+    document.getElementById('refGuideLabel').textContent=
+      S.refWidthMm>=100?`${(S.refWidthMm/10).toFixed(0)}×${(S.refHeightMm/10).toFixed(0)} ס"מ`:`${S.refWidthMm}×${S.refHeightMm} מ"מ`;
   }
-}
-
-function stopCamera() {
-  if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
-}
-
-// ===== CALIBRATION =====
-function setupCalibration() {
-  document.getElementById('calibration-overlay').style.display = 'flex';
-  document.getElementById('camControls').style.display = 'none';
-  document.getElementById('printFrame').style.display = 'none';
-
-  document.getElementById('refNameDisplay').textContent = state.refName;
-  document.getElementById('refGuideLabel').textContent =
-    state.refWidthMm >= 100 ? `${(state.refWidthMm/10).toFixed(0)} × ${(state.refHeightMm/10).toFixed(0)} ס"מ`
-                             : `${state.refWidthMm} × ${state.refHeightMm} מ"מ`;
-  state.calibrated = false;
+  S.calibrated=false; S.lastBeta=null;
   updateCalibBox();
 }
 
-function updateCalibBox() {
-  const slider = document.getElementById('calibSlider');
-  const px = parseInt(slider.value);
-  const box = document.getElementById('refGuideBox');
-  const aspect = state.refWidthMm / state.refHeightMm;
-  const w = px;
-  const h = Math.round(px / aspect);
-  box.style.width = w + 'px';
-  box.style.height = h + 'px';
-  // px per cm based on the ref width
-  const ppc = (px / (state.refWidthMm / 10));
-  document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
+function updateCalibBox(){
+  const px=parseInt(document.getElementById('calibSlider').value);
+  const box=document.getElementById('refGuideBox');
+  const isCustom=S.refType==='custom_ref';
+  let w,h;
+  if(isCustom){w=px;h=Math.round(px*0.6);} // generic rectangle for custom
+  else{const asp=S.refWidthMm/S.refHeightMm;w=px;h=Math.round(px/asp);}
+  box.style.width=w+'px';box.style.height=h+'px';
+  const refCm=isCustom?S.refCalib1Dmm/10:S.refWidthMm/10;
+  document.getElementById('calibPxLabel').textContent=`${(px/refCm).toFixed(1)} px/cm`;
 }
 
-function finishCalibration() {
-  const slider = document.getElementById('calibSlider');
-  const px = parseInt(slider.value);
-  state.pxPerCm = px / (state.refWidthMm / 10);
-  state.calibrated = true;
-
-  document.getElementById('calibration-overlay').style.display = 'none';
-  document.getElementById('camControls').style.display = 'flex';
-  document.getElementById('printFrame').style.display = 'flex';
-
-  // Set initial frame position & size
-  initFrame();
-  updateHUD();
+function rotateCalibRef(){
+  if(S.refType==='custom_ref')return;
+  [S.refWidthMm,S.refHeightMm]=[S.refHeightMm,S.refWidthMm];
+  document.getElementById('refGuideLabel').textContent=
+    S.refWidthMm>=100?`${(S.refWidthMm/10).toFixed(0)}×${(S.refHeightMm/10).toFixed(0)} ס"מ`:`${S.refWidthMm}×${S.refHeightMm} מ"מ`;
+  updateCalibBox();
 }
 
-function recalibrate() {
-  setupCalibration();
+function finishCalibration(){
+  const px=parseInt(document.getElementById('calibSlider').value);
+  const refCm=S.refType==='custom_ref'?S.refCalib1Dmm/10:S.refWidthMm/10;
+  S.pxPerCm=px/refCm;
+  S.calibrated=true; S.lastBeta=_curBeta;
+  document.getElementById('calibration-overlay').style.display='none';
+  document.getElementById('camControls').style.display='flex';
+  document.getElementById('printFrame').style.display='block';
+  initFrame(); updateHUD();
+}
+function recalibrate(){setupCalibration();}
+
+// FRAME
+function initFrame(){
+  S.frameRotation=0;
+  S.frameW=S.printW*S.pxPerCm; S.frameH=S.printH*S.pxPerCm;
+  const ov=document.getElementById('photo-overlay');
+  S.frameX=ov.clientWidth/2-S.frameW/2;
+  S.frameY=ov.clientHeight/2-S.frameH/2;
+  document.getElementById('overlayImg').src=S.imageSrc;
+  applyFrame(); setupDrag(); setupSliders();
 }
 
-function initFrame() {
-  const frame = document.getElementById('printFrame');
-  const overlay = document.getElementById('photo-overlay');
-  const overlayImg = document.getElementById('overlayImg');
+function applyFrame(){
+  const f=document.getElementById('printFrame');
+  f.style.width=S.frameW+'px'; f.style.height=S.frameH+'px';
+  f.style.left=S.frameX+'px'; f.style.top=S.frameY+'px';
+  f.style.transform=`rotate(${S.frameRotation}deg)`;
+  document.getElementById('frameLabel').textContent=`${S.printW.toFixed(0)}×${S.printH.toFixed(0)} ס"מ`;
+}
+function updateHUD(){document.getElementById('hudSizeBadge').textContent=`${S.printW.toFixed(0)}×${S.printH.toFixed(0)} ס"מ`;}
 
-  overlayImg.src = state.imageSrc;
-
-  const w = state.printW * state.pxPerCm;
-  const h = state.printH * state.pxPerCm;
-
-  state.frameW = w;
-  state.frameH = h;
-
-  const cx = overlay.clientWidth / 2;
-  const cy = overlay.clientHeight / 2;
-  state.frameX = cx - w / 2;
-  state.frameY = cy - h / 2;
-
-  applyFrame();
-  setupDrag();
-  setupSliders();
+function rotatePrintFrame(){
+  S.frameRotation=(S.frameRotation+90)%360;
+  [S.printW,S.printH]=[S.printH,S.printW];
+  [S.frameW,S.frameH]=[S.frameH,S.frameW];
+  applyFrame(); syncSliders(); updateHUD();
 }
 
-function applyFrame() {
-  const frame = document.getElementById('printFrame');
-  frame.style.width = state.frameW + 'px';
-  frame.style.height = state.frameH + 'px';
-  frame.style.left = state.frameX + 'px';
-  frame.style.top = state.frameY + 'px';
-  updateFrameLabel();
-}
-
-function updateFrameLabel() {
-  document.getElementById('frameLabel').textContent = `${state.printW.toFixed(0)}×${state.printH.toFixed(0)} ס"מ`;
-}
-
-function updateHUD() {
-  document.getElementById('hudSizeBadge').textContent = `${state.printW.toFixed(0)}×${state.printH.toFixed(0)} ס"מ`;
-}
-
-// ===== DRAG =====
-function setupDrag() {
-  const frame = document.getElementById('printFrame');
-  const handle = document.getElementById('resizeHandle');
-  let dragging = false, resizing = false;
-  let startX, startY, startFX, startFY, startFW, startFH;
-
-  function onDown(e) {
-    if (e.target === handle || handle.contains(e.target)) return;
-    dragging = true;
-    const pt = e.touches ? e.touches[0] : e;
-    startX = pt.clientX; startY = pt.clientY;
-    startFX = state.frameX; startFY = state.frameY;
-    e.preventDefault();
+// DRAG
+function setupDrag(){
+  const frame=document.getElementById('printFrame');
+  const handle=document.getElementById('resizeHandle');
+  let drag=false,resize=false,sx,sy,sfx,sfy,sfw,sfh;
+  frame.addEventListener('mousedown',e=>{if(e.target===handle||handle.contains(e.target))return;drag=true;sx=e.clientX;sy=e.clientY;sfx=S.frameX;sfy=S.frameY;e.preventDefault();});
+  frame.addEventListener('touchstart',e=>{if(e.target===handle||handle.contains(e.target))return;drag=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY;sfx=S.frameX;sfy=S.frameY;e.preventDefault();},{passive:false});
+  handle.addEventListener('mousedown',e=>{resize=true;sx=e.clientX;sy=e.clientY;sfw=S.frameW;sfh=S.frameH;e.stopPropagation();e.preventDefault();});
+  handle.addEventListener('touchstart',e=>{resize=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY;sfw=S.frameW;sfh=S.frameH;e.stopPropagation();e.preventDefault();},{passive:false});
+  document.addEventListener('mousemove',e=>{const cx=e.clientX,cy=e.clientY;move(cx,cy);});
+  document.addEventListener('touchmove',e=>{const cx=e.touches[0].clientX,cy=e.touches[0].clientY;move(cx,cy);e.preventDefault();},{passive:false});
+  document.addEventListener('mouseup',()=>{drag=false;resize=false;});
+  document.addEventListener('touchend',()=>{drag=false;resize=false;});
+  function move(cx,cy){
+    if(drag){S.frameX=sfx+cx-sx;S.frameY=sfy+cy-sy;frame.style.left=S.frameX+'px';frame.style.top=S.frameY+'px';}
+    if(resize){S.frameW=Math.max(40,sfw+cx-sx);S.frameH=Math.max(40,sfh+cy-sy);S.printW=S.frameW/S.pxPerCm;S.printH=S.frameH/S.pxPerCm;frame.style.width=S.frameW+'px';frame.style.height=S.frameH+'px';document.getElementById('frameLabel').textContent=`${S.printW.toFixed(0)}×${S.printH.toFixed(0)} ס"מ`;updateHUD();syncSliders();}
   }
-  function onMove(e) {
-    const pt = e.touches ? e.touches[0] : e;
-    if (dragging) {
-      state.frameX = startFX + pt.clientX - startX;
-      state.frameY = startFY + pt.clientY - startY;
-      applyFrame();
-    }
-    if (resizing) {
-      const dx = pt.clientX - startX;
-      const dy = pt.clientY - startY;
-      const newW = Math.max(40, startFW + dx);
-      const newH = Math.max(40, startFH + dy);
-      state.frameW = newW;
-      state.frameH = newH;
-      state.printW = newW / state.pxPerCm;
-      state.printH = newH / state.pxPerCm;
-      applyFrame();
-      updateHUD();
-      syncSliders();
-    }
-    e.preventDefault();
-  }
-  function onUp() { dragging = false; resizing = false; }
-
-  frame.addEventListener('mousedown', onDown);
-  frame.addEventListener('touchstart', onDown, { passive: false });
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('touchmove', onMove, { passive: false });
-  document.addEventListener('mouseup', onUp);
-  document.addEventListener('touchend', onUp);
-
-  handle.addEventListener('mousedown', (e) => {
-    resizing = true;
-    const pt = e.touches ? e.touches[0] : e;
-    startX = pt.clientX; startY = pt.clientY;
-    startFW = state.frameW; startFH = state.frameH;
-    e.stopPropagation(); e.preventDefault();
-  });
-  handle.addEventListener('touchstart', (e) => {
-    resizing = true;
-    const pt = e.touches[0];
-    startX = pt.clientX; startY = pt.clientY;
-    startFW = state.frameW; startFH = state.frameH;
-    e.stopPropagation(); e.preventDefault();
-  }, { passive: false });
 }
 
-// ===== SLIDERS =====
-function setupSliders() {
-  document.getElementById('sliderW').min = 5;
-  document.getElementById('sliderW').max = 200;
-  document.getElementById('sliderH').min = 5;
-  document.getElementById('sliderH').max = 200;
-  syncSliders();
-}
+// SLIDERS
+function setupSliders(){syncSliders();}
+function syncSliders(){document.getElementById('sliderW').value=S.printW.toFixed(0);document.getElementById('sliderH').value=S.printH.toFixed(0);document.getElementById('valW').textContent=S.printW.toFixed(0)+'cm';document.getElementById('valH').textContent=S.printH.toFixed(0)+'cm';}
+function onSliderW(){const w=parseFloat(document.getElementById('sliderW').value);S.printW=w;if(S.locked)S.printH=w/S.imageAspect;S.frameW=S.printW*S.pxPerCm;S.frameH=S.printH*S.pxPerCm;applyFrame();syncSliders();updateHUD();}
+function onSliderH(){const h=parseFloat(document.getElementById('sliderH').value);S.printH=h;if(S.locked)S.printW=h*S.imageAspect;S.frameH=S.printH*S.pxPerCm;S.frameW=S.printW*S.pxPerCm;applyFrame();syncSliders();updateHUD();}
 
-function syncSliders() {
-  document.getElementById('sliderW').value = state.printW.toFixed(0);
-  document.getElementById('sliderH').value = state.printH.toFixed(0);
-  document.getElementById('valW').textContent = state.printW.toFixed(0) + 'cm';
-  document.getElementById('valH').textContent = state.printH.toFixed(0) + 'cm';
-}
-
-function onSliderW() {
-  const w = parseFloat(document.getElementById('sliderW').value);
-  state.printW = w;
-  if (state.locked) {
-    state.printH = w / state.imageAspect;
-    document.getElementById('sliderH').value = state.printH.toFixed(0);
-  }
-  state.frameW = state.printW * state.pxPerCm;
-  state.frameH = state.printH * state.pxPerCm;
-  applyFrame();
-  syncSliders();
-  updateHUD();
-}
-
-function onSliderH() {
-  const h = parseFloat(document.getElementById('sliderH').value);
-  state.printH = h;
-  if (state.locked) {
-    state.printW = h * state.imageAspect;
-    document.getElementById('sliderW').value = state.printW.toFixed(0);
-  }
-  state.frameH = state.printH * state.pxPerCm;
-  state.frameW = state.printW * state.pxPerCm;
-  applyFrame();
-  syncSliders();
-  updateHUD();
-}
-
-// ===== CAPTURE =====
-function capturePhoto() {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('captured-canvas');
-  const frame = document.getElementById('printFrame');
-  const overlay = document.getElementById('photo-overlay');
-  const camScreen = document.getElementById('camera-screen');
-
-  canvas.width = video.videoWidth || camScreen.clientWidth;
-  canvas.height = video.videoHeight || camScreen.clientHeight;
-
-  const ctx = canvas.getContext('2d');
-
-  // Draw video
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  // Scale factors (video vs display)
-  const scaleX = canvas.width / camScreen.clientWidth;
-  const scaleY = canvas.height / camScreen.clientHeight;
-
-  // Draw image overlay
-  const img = new Image();
-  img.src = state.imageSrc;
-  ctx.drawImage(img,
-    state.frameX * scaleX,
-    state.frameY * scaleY,
-    state.frameW * scaleX,
-    state.frameH * scaleY
-  );
-
-  // Draw border
-  ctx.strokeStyle = 'rgba(232,201,122,0.8)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(
-    state.frameX * scaleX,
-    state.frameY * scaleY,
-    state.frameW * scaleX,
-    state.frameH * scaleY
-  );
-
-  // Label
-  ctx.fillStyle = 'rgba(13,13,15,0.75)';
-  const lx = state.frameX * scaleX;
-  const ly = (state.frameY + state.frameH) * scaleY + 4;
-  ctx.fillRect(lx, ly, 120, 20);
-  ctx.fillStyle = '#e8c97a';
-  ctx.font = '12px Space Mono, monospace';
-  ctx.fillText(`${state.printW.toFixed(0)}×${state.printH.toFixed(0)} cm`, lx + 6, ly + 14);
-
+// CAPTURE
+function capturePhoto(){
+  const video=document.getElementById('video');
+  const canvas=document.getElementById('captured-canvas');
+  const cam=document.getElementById('camera-screen');
+  canvas.width=video.videoWidth||cam.clientWidth;
+  canvas.height=video.videoHeight||cam.clientHeight;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  const sx=canvas.width/cam.clientWidth, sy=canvas.height/cam.clientHeight;
+  const cx=(S.frameX+S.frameW/2)*sx, cy=(S.frameY+S.frameH/2)*sy;
+  const fw=S.frameW*sx, fh=S.frameH*sy;
+  const rot=S.frameRotation*Math.PI/180;
+  const ry=Math.max(-50,Math.min(50,_curGamma*0.6));
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(rot);
+  if(Math.abs(ry)>3){ctx.transform(1,0,Math.tan(ry*Math.PI/180)*0.35,1,0,0);}
+  const img=new Image(); img.src=S.imageSrc;
+  ctx.drawImage(img,-fw/2,-fh/2,fw,fh);
+  ctx.strokeStyle='rgba(232,201,122,0.85)'; ctx.lineWidth=2;
+  ctx.strokeRect(-fw/2,-fh/2,fw,fh);
+  ctx.restore();
+  const lx=S.frameX*sx, ly=(S.frameY+S.frameH)*sy+4;
+  ctx.fillStyle='rgba(13,13,15,0.75)'; ctx.fillRect(lx,ly,130,20);
+  ctx.fillStyle='#e8c97a'; ctx.font='12px Space Mono,monospace';
+  ctx.fillText(`${S.printW.toFixed(0)}×${S.printH.toFixed(0)} cm`,lx+6,ly+14);
   showScreen('captured-screen');
 }
+function backToCamera(){showScreen('camera-screen');}
+function savePhoto(){const a=document.createElement('a');a.href=document.getElementById('captured-canvas').toDataURL('image/jpeg',0.92);a.download=`print-preview-${S.printW.toFixed(0)}x${S.printH.toFixed(0)}cm.jpg`;a.click();}
+async function sharePhoto(){document.getElementById('captured-canvas').toBlob(async blob=>{if(navigator.share&&navigator.canShare){const f=new File([blob],'print-preview.jpg',{type:'image/jpeg'});if(navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'תצוגה מקדימה להדפסה'});return;}}savePhoto();},'image/jpeg',0.92);}
 
-function backToCamera() {
-  showScreen('camera-screen');
-}
-
-function savePhoto() {
-  const canvas = document.getElementById('captured-canvas');
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/jpeg', 0.92);
-  a.download = `print-preview-${state.printW.toFixed(0)}x${state.printH.toFixed(0)}cm.jpg`;
-  a.click();
-}
-
-async function sharePhoto() {
-  const canvas = document.getElementById('captured-canvas');
-  canvas.toBlob(async (blob) => {
-    if (navigator.share && navigator.canShare) {
-      const file = new File([blob], 'print-preview.jpg', { type: 'image/jpeg' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'תצוגה מקדימה להדפסה' });
-        return;
-      }
-    }
-    // fallback: download
-    savePhoto();
-  }, 'image/jpeg', 0.92);
+// iOS permission
+if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+  document.addEventListener('click',async()=>{try{await DeviceOrientationEvent.requestPermission();}catch{}},{once:true});
 }
 </script>
 </body>
