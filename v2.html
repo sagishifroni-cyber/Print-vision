@@ -1253,30 +1253,56 @@ const v2 = { corners: [], dragging: -1 };
 function startCornerDetection() {
   const video     = document.getElementById('video');
   const camScreen = document.getElementById('camera-screen');
-  const W = camScreen.clientWidth;
-  const H = camScreen.clientHeight;
+  const W = camScreen.clientWidth  || window.innerWidth;
+  const H = camScreen.clientHeight || window.innerHeight;
 
   // לכוד פריים לניתוח
   const cap = document.createElement('canvas');
   cap.width = W; cap.height = H;
   cap.getContext('2d').drawImage(video, 0, 0, W, H);
 
-  // אזור החיפוש = מסגרת הכיול + 20% מרווח
-  const guideEl = document.getElementById('refGuideBox');
-  const guideR  = guideEl.getBoundingClientRect();
-  const camR    = camScreen.getBoundingClientRect();
-  const margin  = Math.max(guideR.width, guideR.height) * 0.25;
-  const roi = {
-    x: Math.max(0, guideR.left - camR.left - margin),
-    y: Math.max(0, guideR.top  - camR.top  - margin),
-    w: Math.min(W, guideR.width  + margin * 2),
-    h: Math.min(H, guideR.height + margin * 2),
-  };
+  // אזור החיפוש — השתמש בגודל המסגרת הנראית (guideBox או guideLine)
+  const camR   = camScreen.getBoundingClientRect();
+  let roi;
 
-  const detected = detectRectCorners(cap, roi, W, H);
-  v2.corners = detected;
+  const guideBox  = document.getElementById('refGuideBox');
+  const guideLine = document.getElementById('refGuideLine');
+  const guideEl   = (guideBox.style.display  !== 'none') ? guideBox
+                  : (guideLine.style.display !== 'none') ? guideLine
+                  : null;
 
-  // הצג overlay לאישור
+  if (guideEl) {
+    const gr     = guideEl.getBoundingClientRect();
+    const margin = Math.max(gr.width, gr.height) * 0.35;
+    roi = {
+      x: Math.max(0, gr.left - camR.left - margin),
+      y: Math.max(0, gr.top  - camR.top  - margin),
+      w: Math.min(W, gr.width  + margin * 2),
+      h: Math.min(H, gr.height + margin * 2),
+    };
+  } else {
+    // fallback — חצי מרכזי של המסך
+    roi = { x: W*0.1, y: H*0.1, w: W*0.8, h: H*0.8 };
+  }
+
+  // וודא ש-ROI הגיוני
+  if (!roi.w || !roi.h || roi.w < 20 || roi.h < 20) {
+    roi = { x: W*0.1, y: H*0.1, w: W*0.8, h: H*0.8 };
+  }
+
+  try {
+    const detected = detectRectCorners(cap, roi, W, H);
+    v2.corners = detected;
+  } catch(e) {
+    // fallback לפינות ה-ROI
+    v2.corners = [
+      { x: roi.x,         y: roi.y          },
+      { x: roi.x+roi.w,   y: roi.y          },
+      { x: roi.x+roi.w,   y: roi.y+roi.h    },
+      { x: roi.x,         y: roi.y+roi.h    },
+    ];
+  }
+
   showCornerOverlay();
 }
 
