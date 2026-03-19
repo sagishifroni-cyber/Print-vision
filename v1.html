@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrintVision – ראה את התמונה על הקיר</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #e8c97a;
+    --accent2: #7ac9e8;
+    --text: #f0ede8;
+    --text-muted: #7a7a8a;
+    --danger: #e87a7a;
+    --success: #7ae8a0;
+    --overlay-color: rgba(232, 201, 122, 0.18);
+    --overlay-border: rgba(232, 201, 122, 0.7);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== SCREENS ===== */
+  .screen {
+    display: none;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .screen.active { display: flex; }
+
+  /* ===== WELCOME SCREEN ===== */
+  #welcome {
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 2rem;
+    background: radial-gradient(ellipse at 30% 20%, #1a1a2e 0%, var(--bg) 60%);
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+
+  .welcome-title {
+    font-size: clamp(2rem, 8vw, 3.5rem);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.15;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.4s;
+  }
+  .welcome-title span { color: var(--accent); }
+
+  .welcome-sub {
+    font-size: 1rem;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.7;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.6s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0d0f;
+    border: none;
+    padding: 1rem 2.5rem;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.8s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,201,122,0.3); }
+  .btn-primary:active { transform: translateY(0); }
+
+  /* ===== SETUP SCREEN ===== */
+  #setup {
+    overflow-y: auto;
+    padding: 1.5rem 1.5rem 6rem;
+    gap: 1.5rem;
+  }
+
+  .setup-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s, color 0.2s;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .setup-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  /* Step indicators */
+  .steps {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .step-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .step-dot.active { background: var(--accent); transform: scale(1.3); }
+  .step-dot.done { background: var(--success); }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Image upload */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(232,201,122,0.04); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .upload-zone p { color: var(--text-muted); font-size: 0.9rem; }
+  .upload-zone.has-image { border-style: solid; border-color: var(--success); }
+  .upload-preview {
+    width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+    border-radius: 4px;
+    display: none;
+    margin-top: 0.5rem;
+  }
+  .upload-preview.visible { display: block; }
+
+  /* Size selection */
+  .size-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  .size-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem 0.4rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.8rem;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    line-height: 1.3;
+  }
+  .size-btn:hover { border-color: var(--accent2); }
+  .size-btn.active { border-color: var(--accent); background: rgba(232,201,122,0.1); color: var(--accent); }
+  .size-btn .size-dims { font-size: 0.7rem; color: var(--text-muted); display: block; }
+  .size-btn.active .size-dims { color: var(--accent); opacity: 0.7; }
+
+  /* Custom size */
+  .custom-size-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .custom-input-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
+  .custom-input-wrap label { font-size: 0.75rem; color: var(--text-muted); }
+  .custom-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.9rem;
+    text-align: center;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .custom-input:focus { outline: none; border-color: var(--accent); }
+  .custom-input::placeholder { color: var(--text-muted); }
+  .lock-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    margin-top: 1.2rem;
+  }
+  .lock-btn.locked { border-color: var(--accent); color: var(--accent); background: rgba(232,201,122,0.08); }
+
+  /* Reference object */
+  .ref-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  .ref-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .ref-card:hover { border-color: var(--accent2); }
+  .ref-card.active { border-color: var(--accent); background: rgba(232,201,122,0.07); }
+  .ref-card .ref-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .ref-card .ref-text { font-size: 0.85rem; font-weight: 500; }
+  .ref-card .ref-size { font-size: 0.72rem; color: var(--text-muted); }
+  .ref-card.active .ref-size { color: var(--accent); opacity: 0.7; }
+
+  /* Custom reference */
+  .custom-ref-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    margin-top: 0.6rem;
+  }
+  .custom-ref-row .custom-input-wrap { flex: 1; }
+
+  /* Start button */
+  .start-btn-wrap {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
+  }
+  .btn-start {
+    width: 100%;
+    background: var(--accent);
+    color: #0d0d0f;
+    border: none;
+    padding: 1rem;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .btn-start:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-start:not(:disabled):hover { transform: translateY(-1px); }
+
+  /* ===== AR CAMERA SCREEN ===== */
+  #camera-screen {
+    position: relative;
+    background: #000;
+  }
+
+  #video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Calibration overlay */
+  #calibration-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.65);
+    z-index: 10;
+    gap: 1.5rem;
+    padding: 2rem;
+    text-align: center;
+  }
+  .calib-title { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+  .calib-sub { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+
+  .ref-guide-box {
+    border: 2px solid var(--accent2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(122, 201, 232, 0.08);
+    position: relative;
+  }
+  .ref-guide-box span { font-size: 0.75rem; color: var(--accent2); font-family: 'Space Mono', monospace; }
+
+  .calib-slider-wrap { width: 100%; max-width: 320px; }
+  .calib-slider-label {
+    display: flex; justify-content: space-between;
+    font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;
+  }
+  .calib-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  .calib-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .btn-calib-done {
+    background: var(--accent2);
+    color: #0d0d0f;
+    border: none;
+    padding: 0.8rem 2rem;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  /* Photo overlay */
+  #photo-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .print-frame {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: move;
+    pointer-events: all;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .print-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .frame-border {
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--overlay-border);
+    pointer-events: none;
+  }
+
+  .frame-label {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(13,13,15,0.8);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .resize-handle {
+    position: absolute;
+    bottom: -4px; right: -4px;
+    width: 20px; height: 20px;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    border-radius: 2px;
+    cursor: se-resize;
+    pointer-events: all;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    color: #0d0d0f;
+  }
+
+  /* Top HUD */
+  .cam-hud-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1rem 0.5rem;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  }
+  .hud-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+  }
+  .hud-size-badge {
+    background: rgba(232,201,122,0.15);
+    border: 1px solid var(--overlay-border);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 3px;
+  }
+
+  /* Bottom controls */
+  .cam-controls {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 20;
+    padding: 1rem 1.5rem 2rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .ctrl-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    width: 50px;
+    flex-shrink: 0;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .size-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.2);
+    outline: none;
+  }
+  .size-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .ctrl-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    width: 42px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .cam-btns {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+  }
+
+  .cam-btn {
+    flex: 1;
+    padding: 0.7rem;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .cam-btn:active { transform: scale(0.96); }
+  .cam-btn.secondary {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    flex: 0.6;
+  }
+  .cam-btn.primary {
+    background: var(--accent);
+    color: #0d0d0f;
+  }
+  .cam-btn.danger {
+    background: var(--danger);
+    color: #fff;
+    flex: 0.6;
+  }
+
+  /* Captured photo screen */
+  #captured-screen {
+    position: relative;
+    background: #000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #captured-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .captured-controls {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 1rem 1.5rem 2rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+    display: flex;
+    gap: 0.8rem;
+    z-index: 10;
+  }
+  .captured-controls .cam-btn { flex: 1; }
+
+  /* ===== ANIMATIONS ===== */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Info tooltip */
+  .info-pill {
+    background: rgba(122, 201, 232, 0.12);
+    border: 1px solid rgba(122, 201, 232, 0.3);
+    color: var(--accent2);
+    font-size: 0.78rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    line-height: 1.5;
+    margin-top: 0.5rem;
+  }
+
+  /* Rotate buttons */
+  .rotate-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+  .rotate-hint { font-size: 0.8rem; color: var(--text-muted); flex: 1; }
+  .rotate-btn-small {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+    font-family: 'Heebo', sans-serif; transition: border-color 0.2s, color 0.2s;
+  }
+  .rotate-btn-small:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Custom ref single-dim toggle */
+  .dim-toggle { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+  .dim-btn {
+    flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 0.45rem; border-radius: 4px; cursor: pointer; font-family: 'Heebo', sans-serif;
+    font-size: 0.8rem; transition: all 0.2s;
+  }
+  .dim-btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(122,201,232,0.08); }
+
+  /* distance warning banner */
+  #dist-warn {
+    display: none; position: absolute; top: 3.5rem; left: 1rem; right: 1rem;
+    z-index: 25; background: rgba(232,201,122,0.15); border: 1px solid rgba(232,201,122,0.5);
+    color: var(--accent); font-size: 0.82rem; padding: 0.5rem 0.75rem; border-radius: 6px;
+    text-align: center; pointer-events: none;
+  }
+
+  /* Scrollbar */
+  #setup::-webkit-scrollbar { width: 4px; }
+  #setup::-webkit-scrollbar-track { background: transparent; }
+  #setup::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ===== WELCOME ===== -->
+<div id="welcome" class="screen active">
+  <div class="logo">PrintVision</div>
+  <h1 class="welcome-title">תראה את התמונה<br><span>על הקיר שלך</span></h1>
+  <p class="welcome-sub">העלה תמונה, בחר גודל הדפסה, וצפה בה מוטמעת בזמן אמת על הקיר שלך דרך המצלמה.</p>
+  <button class="btn-primary" onclick="goToSetup()">בואו נתחיל ←</button>
+</div>
+
+<!-- ===== SETUP ===== -->
+<div id="setup" class="screen">
+  <div class="setup-header">
+    <button class="back-btn" onclick="goToWelcome()">←</button>
+    <div class="setup-title">הגדרת תצוגה</div>
+    <div class="steps">
+      <div class="step-dot active" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+    </div>
+  </div>
+
+  <!-- Step 1: Upload image -->
+  <div>
+    <div class="section-label">שלב 1 — תמונה</div>
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" accept="image/*" id="imageInput" onchange="handleImageUpload(event)">
+      <div id="uploadContent">
+        <div class="upload-icon">🖼️</div>
+        <p>לחץ להעלאת תמונה<br><small>JPG, PNG, WEBP</small></p>
+      </div>
+      <img id="uploadPreview" class="upload-preview" alt="preview">
+    </div>
+    <div class="rotate-row" id="rotateImgRow" style="display:none;">
+      <span class="rotate-hint">כיוון לא נכון?</span>
+      <button class="rotate-btn-small" onclick="rotateImage()">↻ סובב תמונה 90°</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Print size -->
+  <div>
+    <div class="section-label">שלב 2 — גודל הדפסה</div>
+    <div class="size-grid">
+      <button class="size-btn" onclick="selectSize('10x15')" data-size="10x15">10×15<span class="size-dims">ס"מ</span></button>
+      <button class="size-btn" onclick="selectSize('A4')" data-size="A4">A4<span class="size-dims">21×29.7</span></button>
+      <button class="size-btn" onclick="selectSize('A3')" data-size="A3">A3<span class="size-dims">29.7×42</span></button>
+      <button class="size-btn" onclick="selectSize('20x30')" data-size="20x30">20×30<span class="size-dims">ס"מ</span></button>
+      <button class="size-btn" onclick="selectSize('30x40')" data-size="30x40">30×40<span class="size-dims">ס"מ</span></button>
+      <button class="size-btn" onclick="selectSize('50x70')" data-size="50x70">50×70<span class="size-dims">ס"מ</span></button>
+    </div>
+
+    <div style="margin-top:0.75rem;">
+      <div class="section-label" style="margin-bottom:0.5rem;">או הזן גודל מותאם</div>
+      <div class="custom-size-row">
+        <div class="custom-input-wrap">
+          <label>רוחב (ס"מ)</label>
+          <input class="custom-input" type="number" id="customW" placeholder="30" min="5" max="200" oninput="onCustomSize()">
+        </div>
+        <button class="lock-btn locked" id="lockBtn" onclick="toggleLock()" title="נעל פרופורציה">🔒</button>
+        <div class="custom-input-wrap">
+          <label>גובה (ס"מ)</label>
+          <input class="custom-input" type="number" id="customH" placeholder="40" min="5" max="200" oninput="onCustomSize()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Reference object -->
+  <div>
+    <div class="section-label">שלב 3 — חפץ ייחוס לכיול</div>
+    <div class="ref-cards">
+      <div class="ref-card active" id="ref-card" onclick="selectRef('card')">
+        <span class="ref-icon">💳</span>
+        <div>
+          <div class="ref-text">כרטיס אשראי</div>
+          <div class="ref-size" id="cardSizeLabel">85.6 × 54 מ"מ</div>
+        </div>
+      </div>
+      <div class="ref-card" id="ref-a4" onclick="selectRef('a4')">
+        <span class="ref-icon">📄</span>
+        <div>
+          <div class="ref-text">דף A4</div>
+          <div class="ref-size" id="a4SizeLabel">210 × 297 מ"מ</div>
+        </div>
+      </div>
+      <div class="ref-card" onclick="selectRef('custom_ref')" id="ref-custom_ref" style="grid-column:span 2;">
+        <span class="ref-icon">📐</span>
+        <div style="flex:1;">
+          <div class="ref-text">חפץ מותאם</div>
+          <div class="ref-size">הזן מידה אחת</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rotation row for card / a4 -->
+    <div class="rotate-row" id="refRotateRow">
+      <span class="rotate-hint">החפץ בכיוון לא נכון?</span>
+      <button class="rotate-btn-small" onclick="rotateRef()">↻ סובב חפץ 90°</button>
+    </div>
+
+    <!-- Custom ref inputs — single dimension -->
+    <div id="custom-ref-input" style="display:none; margin-top:0.6rem;">
+      <div class="custom-ref-row">
+        <div class="custom-input-wrap" style="flex:1;">
+          <label>שם החפץ (אופציונלי)</label>
+          <input class="custom-input" type="text" id="refName" placeholder='למשל: ספה'>
+        </div>
+      </div>
+      <div class="dim-toggle">
+        <button class="dim-btn active" id="dimBtnW" onclick="selectDim('w')">רוחב (ס"מ)</button>
+        <button class="dim-btn" id="dimBtnH" onclick="selectDim('h')">גובה (ס"מ)</button>
+      </div>
+      <input class="custom-input" type="number" id="refMeasure" placeholder="160" min="1" max="1000"
+             oninput="validateSetup()" style="width:100%; margin-top:0.5rem;">
+    </div>
+
+    <div class="info-pill">
+      📍 לפני הצילום, הנח את החפץ שבחרת מול המצלמה כדי שנוכל לכייל את הגודל האמיתי.
+    </div>
+    <div class="info-pill" style="margin-top:0.5rem; background:rgba(232,201,122,0.08); border-color:rgba(232,201,122,0.3); color:var(--accent);">
+      ⚠️ שמור על מרחק קבוע מהקיר לאורך כל הצילום. אם התקרבת או התרחקת — לחץ "כייל מחדש".
+    </div>
+  </div>
+
+  <div class="start-btn-wrap">
+    <button class="btn-start" id="startBtn" onclick="startCamera()" disabled>פתח מצלמה ←</button>
+  </div>
+</div>
+
+<!-- ===== CAMERA SCREEN ===== -->
+<div id="camera-screen" class="screen">
+  <video id="video" autoplay playsinline muted></video>
+
+  <!-- Calibration overlay -->
+  <div id="calibration-overlay">
+    <div class="calib-title">כיול גודל</div>
+    <p class="calib-sub" id="calibSubText">כוון את <strong id="refNameDisplay">כרטיס האשראי</strong> שלך לתוך המסגרת המסומנת, ואחר כך גרור את הסליידר עד שגודל המסגרת תואם את גודל החפץ.</p>
+
+    <div id="refGuideBox" class="ref-guide-box">
+      <span id="refGuideLabel">85.6 × 54 מ"מ</span>
+    </div>
+    <!-- סרגל קו לחפץ מותאם -->
+    <div id="refGuideLine" style="display:none; align-items:center; justify-content:center; flex-direction:column; gap:6px;">
+      <div id="refLineEl" style="background:var(--accent2); border-radius:2px;"></div>
+      <span id="refLineLabel" style="font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--accent2);"></span>
+    </div>
+
+    <div class="calib-slider-wrap">
+      <div class="calib-slider-label">
+        <span>קטן יותר</span>
+        <span id="calibPxLabel">—</span>
+        <span>גדול יותר</span>
+      </div>
+      <input type="range" class="calib-slider" id="calibSlider" min="30" max="400" value="120" oninput="updateCalibBox()">
+    </div>
+
+    <button class="btn-calib-done" onclick="finishCalibration()">✓ הגדלים תואמים — המשך</button>
+    <div id="calibRotateRow" style="margin-top:0.5rem;">
+      <button class="rotate-btn-small" onclick="rotateRefCalib()">↻ סובב חפץ 90°</button>
+    </div>
+  </div>
+
+  <!-- Perspective calibration overlay (V1) -->
+  <div id="perspective-overlay" style="display:none; position:absolute; inset:0; z-index:12;">
+    <canvas id="perspCanvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+    <div style="position:absolute; top:0; left:0; right:0; background:linear-gradient(to bottom,rgba(0,0,0,0.75),transparent); padding:1rem 1rem 2rem; display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
+      <div style="font-family:'Space Mono',monospace; font-size:0.75rem; letter-spacing:0.2em; color:var(--accent);">PRINTVISION V1</div>
+      <div style="font-size:1rem; font-weight:700; color:var(--text);">יישור לקיר</div>
+      <div style="font-size:0.82rem; color:var(--text-muted); text-align:center; line-height:1.5;">גרור את 4 הנקודות הכחולות לפינות הקיר. התמונה תתאים את עצמה.</div>
+    </div>
+    <div style="position:absolute; bottom:0; left:0; right:0; padding:1rem 1.5rem 2rem; background:linear-gradient(to top,rgba(0,0,0,0.85),transparent); display:flex; gap:0.6rem;">
+      <button class="cam-btn secondary" style="flex:0.7;" onclick="skipPerspective()">דלג ←</button>
+      <button class="cam-btn secondary" onclick="resetPerspPoints()">↺ אפס</button>
+      <button class="cam-btn primary" onclick="applyPerspective()">✓ יישר והמשך</button>
+    </div>
+  </div>
+  <div id="photo-overlay">
+    <div class="print-frame" id="printFrame">
+      <img id="overlayImg" alt="print preview">
+      <div class="frame-border"></div>
+      <div class="frame-label" id="frameLabel">—</div>
+      <div class="resize-handle" id="resizeHandle">↙</div>
+    </div>
+  </div>
+
+  <!-- Distance warning -->
+  <div id="dist-warn">⚠️ שינית מרחק מהקיר — כייל מחדש לדיוק</div>
+
+  <!-- Top HUD -->
+  <div class="cam-hud-top">
+    <div class="hud-logo">PrintVision</div>
+    <div class="hud-size-badge" id="hudSizeBadge">—</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="cam-controls" id="camControls" style="display:none;">
+    <div class="ctrl-row">
+      <span class="ctrl-label">רוחב</span>
+      <input type="range" class="size-slider" id="sliderW" min="5" max="200" value="30" oninput="onSliderW()">
+      <span class="ctrl-val" id="valW">30cm</span>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">גובה</span>
+      <input type="range" class="size-slider" id="sliderH" min="5" max="200" value="40" oninput="onSliderH()">
+      <span class="ctrl-val" id="valH">40cm</span>
+    </div>
+    <div class="cam-btns">
+      <button class="cam-btn secondary" onclick="goToSetup()">⚙ הגדרות</button>
+      <button class="cam-btn secondary" style="flex:0.5;" onclick="rotateImageFrame()" title="סובב תמונה">↻</button>
+      <button class="cam-btn primary" onclick="capturePhoto()">📸 צלם</button>
+      <button class="cam-btn danger" onclick="recalibrate()">⟳ כייל</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CAPTURED ===== -->
+<div id="captured-screen" class="screen">
+  <canvas id="captured-canvas"></canvas>
+  <div class="captured-controls">
+    <button class="cam-btn secondary" onclick="backToCamera()">← חזור</button>
+    <button class="cam-btn primary" onclick="savePhoto()">💾 שמור</button>
+    <button class="cam-btn secondary" onclick="sharePhoto()">↗ שתף</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const state = {
+  imageFile: null,
+  imageSrc: null,
+  imageAspect: 1,
+  imageRotation: 0,      // 0,90,180,270 — for setup preview
+  printW: null,
+  printH: null,
+  refType: 'card',
+  refWidthMm: 85.6,
+  refHeightMm: 54,
+  refName: 'כרטיס האשראי',
+  refDimType: 'w',       // 'w' or 'h' for custom ref
+  pxPerCm: null,
+  calibrated: false,
+  frameW: 0, frameH: 0,
+  frameX: 0, frameY: 0,
+  frameRotation: 0,      // 0,90,180,270 — for camera overlay
+  locked: true,
+  stream: null,
+  homography: null,      // V1: perspective matrix
+  perspSrc: null,
+  perspDstW: 0,
+  perspDstH: 0,
+};
+
+const SIZES = {
+  '10x15': [10, 15], 'A4': [21, 29.7], 'A3': [29.7, 42],
+  '20x30': [20, 30], '30x40': [30, 40], '50x70': [50, 70],
+};
+
+// ===== SCREEN NAV =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goToWelcome() { stopCamera(); showScreen('welcome'); }
+function goToSetup()   { stopCamera(); showScreen('setup'); }
+
+// ===== IMAGE UPLOAD =====
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.imageFile = file;
+  state.imageRotation = 0;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    state.imageSrc = ev.target.result;
+    const img = new Image();
+    img.onload = () => {
+      state.imageAspect = img.width / img.height;
+      renderUploadPreview();
+      document.getElementById('uploadZone').classList.add('has-image');
+      document.getElementById('uploadContent').style.display = 'none';
+      document.getElementById('rotateImgRow').style.display = 'flex';
+      dot(2);
+      validateSetup();
+    };
+    img.src = state.imageSrc;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderUploadPreview() {
+  const preview = document.getElementById('uploadPreview');
+  preview.src = state.imageSrc;
+  preview.style.transform = `rotate(${state.imageRotation}deg)`;
+  preview.style.maxHeight = (state.imageRotation % 180 === 90) ? '110px' : '160px';
+  preview.classList.add('visible');
+}
+
+// שיפור 1: סיבוב תמונה בהגדרות
+function rotateImage() {
+  state.imageRotation = (state.imageRotation + 90) % 360;
+  // swap aspect when 90/270
+  state.imageAspect = 1 / state.imageAspect;
+  if (state.printW && state.printH && state.locked) {
+    [state.printW, state.printH] = [state.printH, state.printW];
+    document.getElementById('customW').value = state.printW;
+    document.getElementById('customH').value = state.printH;
+  }
+  renderUploadPreview();
+}
+
+// ===== SIZE =====
+function selectSize(key) {
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-size="${key}"]`).classList.add('active');
+  const [w, h] = SIZES[key];
+  state.printW = w; state.printH = h;
+  document.getElementById('customW').value = w;
+  document.getElementById('customH').value = h;
+  dot(3); validateSetup();
+}
+
+function onCustomSize() {
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  const w = parseFloat(document.getElementById('customW').value);
+  const h = parseFloat(document.getElementById('customH').value);
+  if (state.locked && state.imageSrc) {
+    const active = document.activeElement.id;
+    if (active === 'customW' && w) {
+      const newH = (w / state.imageAspect).toFixed(1);
+      document.getElementById('customH').value = newH;
+      state.printW = w; state.printH = parseFloat(newH);
+    } else if (active === 'customH' && h) {
+      const newW = (h * state.imageAspect).toFixed(1);
+      document.getElementById('customW').value = newW;
+      state.printH = h; state.printW = parseFloat(newW);
+    }
+  } else {
+    state.printW = w || null; state.printH = h || null;
+  }
+  validateSetup();
+}
+
+function toggleLock() {
+  state.locked = !state.locked;
+  const btn = document.getElementById('lockBtn');
+  btn.classList.toggle('locked', state.locked);
+  btn.textContent = state.locked ? '🔒' : '🔓';
+}
+
+// ===== REF OBJECT =====
+function selectRef(type) {
+  state.refType = type;
+  document.querySelectorAll('.ref-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('ref-' + type)?.classList.add('active');
+  const isCustom = type === 'custom_ref';
+  document.getElementById('custom-ref-input').style.display = isCustom ? 'block' : 'none';
+  document.getElementById('refRotateRow').style.display   = isCustom ? 'none' : 'flex';
+
+  if (type === 'card') {
+    state.refWidthMm = 85.6; state.refHeightMm = 54;
+    state.refName = 'כרטיס האשראי';
+  } else if (type === 'a4') {
+    state.refWidthMm = 210; state.refHeightMm = 297;
+    state.refName = 'דף A4';
+  }
+  validateSetup();
+}
+
+// שיפור 2: סיבוב חפץ ייחוס
+function rotateRef() {
+  [state.refWidthMm, state.refHeightMm] = [state.refHeightMm, state.refWidthMm];
+  // update label in card
+  if (state.refType === 'card') {
+    document.getElementById('cardSizeLabel').textContent = `${state.refWidthMm} × ${state.refHeightMm} מ"מ`;
+  } else if (state.refType === 'a4') {
+    const w = (state.refWidthMm/10).toFixed(0), h = (state.refHeightMm/10).toFixed(0);
+    document.getElementById('a4SizeLabel').textContent = `${w} × ${h} ס"מ`;
+  }
+  updateCalibBox();
+}
+function rotateRefCalib() { rotateRef(); }
+
+// שיפור 3: חפץ מותאם — מידה אחת
+function selectDim(d) {
+  state.refDimType = d;
+  document.getElementById('dimBtnW').classList.toggle('active', d === 'w');
+  document.getElementById('dimBtnH').classList.toggle('active', d === 'h');
+  validateSetup();
+  // עדכן סרגל אם מסך הכיול פתוח
+  if (document.getElementById('calibration-overlay').style.display === 'flex') {
+    updateCalibBox();
+  }
+}
+
+function validateSetup() {
+  const hasImage = !!state.imageSrc;
+  const hasSize  = !!(state.printW && state.printH);
+  let hasRef = (state.refType !== 'custom_ref');
+  if (state.refType === 'custom_ref') {
+    const m = parseFloat(document.getElementById('refMeasure').value);
+    if (m > 0) {
+      // treat the entered value as the calibration dimension (square guide box)
+      state.refWidthMm  = m * 10;
+      state.refHeightMm = m * 10;
+      state.refName = document.getElementById('refName').value.trim() || 'החפץ';
+      hasRef = true;
+    }
+  }
+  document.getElementById('startBtn').disabled = !(hasImage && hasSize && hasRef);
+}
+
+function dot(n) {
+  for (let i = 1; i <= 3; i++) {
+    const d = document.getElementById('dot' + i);
+    if (i < n) { d.classList.remove('active'); d.classList.add('done'); }
+    else if (i === n) { d.classList.add('active'); d.classList.remove('done'); }
+    else { d.classList.remove('active', 'done'); }
+  }
+}
+
+// ===== CAMERA =====
+async function startCamera() {
+  showScreen('camera-screen');
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    document.getElementById('video').srcObject = state.stream;
+    setupCalibration();
+  } catch (err) {
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      document.getElementById('video').srcObject = state.stream;
+      setupCalibration();
+    } catch (e) {
+      alert('לא ניתן לגשת למצלמה. אנא אפשר גישה ונסה שנית.');
+      goToSetup();
+    }
+  }
+}
+
+function stopCamera() {
+  if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
+}
+
+// ===== CALIBRATION =====
+function setupCalibration() {
+  document.getElementById('calibration-overlay').style.display = 'flex';
+  document.getElementById('camControls').style.display = 'none';
+  document.getElementById('printFrame').style.display = 'none';
+  document.getElementById('refNameDisplay').textContent = state.refName;
+  // hide rotate btn for custom ref (no defined 2D size)
+  document.getElementById('calibRotateRow').style.display =
+    state.refType === 'custom_ref' ? 'none' : 'block';
+  state.calibrated = false;
+  updateCalibBox();
+}
+
+function updateCalibBox() {
+  const slider = document.getElementById('calibSlider');
+  const px = parseInt(slider.value);
+  const isCustom = state.refType === 'custom_ref';
+
+  if (isCustom) {
+    // הצג סרגל קו בלבד
+    document.getElementById('refGuideBox').style.display  = 'none';
+    document.getElementById('refGuideLine').style.display = 'flex';
+
+    const dimType = state.refDimType; // 'w' = רוחב → קו אופקי, 'h' = גובה → קו אנכי
+    const line    = document.getElementById('refLineEl');
+    const label   = document.getElementById('refLineLabel');
+    const m       = parseFloat(document.getElementById('refMeasure')?.value) || 0;
+
+    if (dimType === 'w') {
+      line.style.width  = px + 'px';
+      line.style.height = '3px';
+    } else {
+      line.style.width  = '3px';
+      line.style.height = px + 'px';
+    }
+
+    label.textContent = m > 0 ? `${m} ס"מ` : '—';
+    // pxPerCm מבוסס על הציר שנבחר
+    const ppc = px / (m || 1);
+    document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
+
+  } else {
+    // הצג תיבה מלאה לכרטיס / A4
+    document.getElementById('refGuideBox').style.display  = 'flex';
+    document.getElementById('refGuideLine').style.display = 'none';
+
+    const aspect = state.refWidthMm / state.refHeightMm;
+    const w = px;
+    const h = Math.round(px / aspect);
+    const box = document.getElementById('refGuideBox');
+    box.style.width  = w + 'px';
+    box.style.height = h + 'px';
+    const ppc = px / (state.refWidthMm / 10);
+    document.getElementById('calibPxLabel').textContent = `${ppc.toFixed(1)} px/cm`;
+    document.getElementById('refGuideLabel').textContent =
+      state.refWidthMm >= 100
+        ? `${(state.refWidthMm/10).toFixed(0)} × ${(state.refHeightMm/10).toFixed(0)} ס"מ`
+        : `${state.refWidthMm} × ${state.refHeightMm} מ"מ`;
+  }
+}
+
+function finishCalibration() {
+  const slider = document.getElementById('calibSlider');
+  const px = parseInt(slider.value);
+  if (state.refType === 'custom_ref') {
+    const m = parseFloat(document.getElementById('refMeasure').value);
+    state.pxPerCm = px / m;
+  } else {
+    state.pxPerCm = px / (state.refWidthMm / 10);
+  }
+  state.calibrated = true;
+  document.getElementById('calibration-overlay').style.display = 'none';
+  // V1: go to perspective step
+  startPerspectiveStep();
+}
+
+function recalibrate() {
+  state.homography = null;
+  setupCalibration();
+}
+
+// ===== FRAME =====
+function initFrame() {
+  const overlay    = document.getElementById('photo-overlay');
+  const overlayImg = document.getElementById('overlayImg');
+
+  // "אפייה" של הסיבוב מהגדרות לתוך התמונה עצמה על canvas
+  // כך ה-img תמיד ממלא את המסגרת בדיוק, ללא CSS rotate שגורם לחיתוך
+  function setFrameWithSrc(src) {
+    overlayImg.style.transform = '';
+    overlayImg.src = src;
+    state.frameRotation = 0;
+    state.frameW = state.printW * state.pxPerCm;
+    state.frameH = state.printH * state.pxPerCm;
+    state.frameX = overlay.clientWidth  / 2 - state.frameW / 2;
+    state.frameY = overlay.clientHeight / 2 - state.frameH / 2;
+    applyFrame();
+    setupDrag();
+    setupSliders();
+  }
+
+  if (state.imageRotation === 0) {
+    setFrameWithSrc(state.imageSrc);
+    return;
+  }
+
+  // סובב את התמונה על canvas לפי state.imageRotation
+  const img = new Image();
+  img.onload = () => {
+    const rad = state.imageRotation * Math.PI / 180;
+    const isSwapped = state.imageRotation % 180 === 90;
+    const canvas = document.createElement('canvas');
+    canvas.width  = isSwapped ? img.height : img.width;
+    canvas.height = isSwapped ? img.width  : img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    state.imageSrc = canvas.toDataURL('image/jpeg', 0.95);
+    state.imageRotation = 0; // כבר אפוי
+    setFrameWithSrc(state.imageSrc);
+  };
+  img.src = state.imageSrc;
+}
+
+function applyFrame() {
+  const frame = document.getElementById('printFrame');
+  frame.style.width  = state.frameW + 'px';
+  frame.style.height = state.frameH + 'px';
+  frame.style.left   = state.frameX + 'px';
+  frame.style.top    = state.frameY + 'px';
+  frame.style.transform = `rotate(${state.frameRotation}deg)`;
+  updateFrameLabel();
+}
+
+function updateFrameLabel() {
+  document.getElementById('frameLabel').textContent =
+    `${state.printW.toFixed(0)}×${state.printH.toFixed(0)} ס"מ`;
+}
+
+function updateHUD() {
+  document.getElementById('hudSizeBadge').textContent =
+    `${state.printW.toFixed(0)}×${state.printH.toFixed(0)} ס"מ`;
+}
+
+// שיפור 1 (בזמן אמת): סיבוב תמונה על הoverlay
+// במקום CSS rotate (שגורם לחיתוך), אנחנו מרנדרים את התמונה המסובבת על canvas
+// ומשתמשים בה כ-src חדש — כך המסגרת תמיד מתאימה בדיוק לתמונה
+function rotateImageFrame() {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width  = img.height;
+    canvas.height = img.width;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(90 * Math.PI / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    const rotatedSrc = canvas.toDataURL('image/jpeg', 0.95);
+
+    state.imageSrc    = rotatedSrc;
+    state.imageAspect = img.height / img.width;
+
+    // שמור מרכז המסגרת לפני שינוי הממדים
+    const centerX = state.frameX + state.frameW / 2;
+    const centerY = state.frameY + state.frameH / 2;
+
+    // החלף printW/H
+    [state.printW, state.printH] = [state.printH, state.printW];
+
+    // חשב מחדש גודל מסגרת
+    state.frameW = state.printW * state.pxPerCm;
+    state.frameH = state.printH * state.pxPerCm;
+
+    // מקם מחדש סביב אותו מרכז
+    state.frameX = centerX - state.frameW / 2;
+    state.frameY = centerY - state.frameH / 2;
+
+    const overlayImg = document.getElementById('overlayImg');
+    overlayImg.style.transform = '';
+    overlayImg.src = rotatedSrc;
+
+    applyFrame();
+    syncSliders();
+    updateHUD();
+  };
+  img.src = state.imageSrc;
+}
+
+// ====================================================
+// V1 — PERSPECTIVE ENGINE
+// ====================================================
+
+const persp = {
+  points: [],        // 4 x {x,y} — פינות הקיר שהמשתמש מגדיר
+  dragging: -1,      // index של נקודה שנגררת
+  frameGrabbed: null // ImageData של הפריים שנלכד לניתוח
+};
+
+// ------ שלב perspective: לכוד פריים, זהה קווים, הצג נקודות ------
+function startPerspectiveStep() {
+  const video  = document.getElementById('video');
+  const canvas = document.getElementById('perspCanvas');
+  const W = canvas.width  = video.videoWidth  || window.innerWidth;
+  const H = canvas.height = video.videoHeight || window.innerHeight;
+
+  // לכוד פריים נוכחי
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  tmp.getContext('2d').drawImage(video, 0, 0, W, H);
+  persp.frameGrabbed = tmp;
+
+  document.getElementById('perspective-overlay').style.display = 'block';
+
+  // נסה לזהות קוווים אוטומטית
+  const pts = detectWallCorners(tmp);
+  persp.points = pts;
+  drawPerspCanvas();
+  setupPerspDrag();
+}
+
+// ------ Canny-lite + Hough Transform ------
+function detectWallCorners(srcCanvas) {
+  const W = srcCanvas.width, H = srcCanvas.height;
+  const ctx = srcCanvas.getContext('2d');
+  const src = ctx.getImageData(0, 0, W, H);
+
+  // 1. Grayscale
+  const gray = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    const p = i * 4;
+    gray[i] = 0.299 * src.data[p] + 0.587 * src.data[p+1] + 0.114 * src.data[p+2];
+  }
+
+  // 2. Gaussian blur 5x5
+  const blurred = gaussianBlur(gray, W, H);
+
+  // 3. Sobel edge magnitude
+  const edges = sobelEdges(blurred, W, H);
+
+  // 4. Threshold — שמור רק קצוות חזקים
+  const thresh = new Uint8Array(W * H);
+  let maxE = 0;
+  for (let i = 0; i < edges.length; i++) if (edges[i] > maxE) maxE = edges[i];
+  const T = maxE * 0.18;
+  for (let i = 0; i < edges.length; i++) thresh[i] = edges[i] > T ? 255 : 0;
+
+  // 5. Hough Transform — מצא קוווים ישרים
+  const lines = houghLines(thresh, W, H, 80);
+
+  // 6. מצא 4 פינות קיר מהקוווים
+  return cornersFromLines(lines, W, H);
+}
+
+function gaussianBlur(gray, W, H) {
+  const kernel = [2,4,5,4,2, 4,9,12,9,4, 5,12,15,12,5, 4,9,12,9,4, 2,4,5,4,2];
+  const kSum = 159;
+  const out = new Float32Array(W * H);
+  for (let y = 2; y < H-2; y++) {
+    for (let x = 2; x < W-2; x++) {
+      let s = 0;
+      for (let ky = -2; ky <= 2; ky++)
+        for (let kx = -2; kx <= 2; kx++)
+          s += gray[(y+ky)*W + (x+kx)] * kernel[(ky+2)*5 + (kx+2)];
+      out[y*W+x] = s / kSum;
+    }
+  }
+  return out;
+}
+
+function sobelEdges(gray, W, H) {
+  const out = new Float32Array(W * H);
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      const gx =
+        -gray[(y-1)*W+(x-1)] + gray[(y-1)*W+(x+1)]
+        -2*gray[y*W+(x-1)]   + 2*gray[y*W+(x+1)]
+        -gray[(y+1)*W+(x-1)] + gray[(y+1)*W+(x+1)];
+      const gy =
+        -gray[(y-1)*W+(x-1)] - 2*gray[(y-1)*W+x] - gray[(y-1)*W+(x+1)]
+        +gray[(y+1)*W+(x-1)] + 2*gray[(y+1)*W+x] + gray[(y+1)*W+(x+1)];
+      out[y*W+x] = Math.sqrt(gx*gx + gy*gy);
+    }
+  }
+  return out;
+}
+
+function houghLines(thresh, W, H, minVotes) {
+  const diag   = Math.ceil(Math.sqrt(W*W + H*H));
+  const nTheta = 180;
+  const nRho   = diag * 2;
+  const acc    = new Int32Array(nTheta * nRho);
+  const cosT   = [], sinT = [];
+  for (let t = 0; t < nTheta; t++) {
+    const rad = t * Math.PI / nTheta;
+    cosT[t] = Math.cos(rad); sinT[t] = Math.sin(rad);
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!thresh[y*W+x]) continue;
+      for (let t = 0; t < nTheta; t++) {
+        const rho = Math.round(x * cosT[t] + y * sinT[t]) + diag;
+        if (rho >= 0 && rho < nRho) acc[t * nRho + rho]++;
+      }
+    }
+  }
+  // מצא פיקים
+  const lines = [];
+  for (let t = 0; t < nTheta; t++) {
+    for (let r = 0; r < nRho; r++) {
+      const v = acc[t * nRho + r];
+      if (v < minVotes) continue;
+      // non-max suppression בחלון 5x5
+      let isMax = true;
+      for (let dt = -2; dt <= 2 && isMax; dt++)
+        for (let dr = -2; dr <= 2 && isMax; dr++) {
+          const nt = t+dt, nr = r+dr;
+          if (nt>=0 && nt<nTheta && nr>=0 && nr<nRho && (dt||dr))
+            if (acc[nt*nRho+nr] >= v) isMax = false;
+        }
+      if (isMax) lines.push({ theta: t * Math.PI / nTheta, rho: r - diag, votes: v });
+    }
+  }
+  lines.sort((a,b) => b.votes - a.votes);
+  return lines.slice(0, 20);
+}
+
+// מחזיר 4 פינות מהקוווים — intersection של זוגות קוווים
+function cornersFromLines(lines, W, H) {
+  // מפריד לקוווים אופקיים ואנכיים לפי זווית
+  const horiz = lines.filter(l => {
+    const deg = l.theta * 180 / Math.PI;
+    return deg < 30 || deg > 150;
+  });
+  const vert = lines.filter(l => {
+    const deg = l.theta * 180 / Math.PI;
+    return deg >= 30 && deg <= 150;
+  });
+
+  // fallback אם לא נמצאו קוווים מספיקים
+  if (horiz.length < 2 || vert.length < 2) {
+    return defaultCorners(W, H);
+  }
+
+  // לקח 2 קוווים אופקיים ו-2 אנכיים עם הכי הרבה votes
+  const h1 = horiz[0], h2 = horiz[1];
+  const v1 = vert[0],  v2 = vert[1];
+
+  const pts = [
+    lineIntersect(h1, v1),
+    lineIntersect(h1, v2),
+    lineIntersect(h2, v2),
+    lineIntersect(h2, v1),
+  ].map(p => ({
+    x: Math.max(10, Math.min(W-10, p.x)),
+    y: Math.max(10, Math.min(H-10, p.y))
+  }));
+
+  // אם הנקודות לא יוצרות מרובע סביר — fallback
+  if (!isReasonableQuad(pts, W, H)) return defaultCorners(W, H);
+  return pts;
+}
+
+function lineIntersect(l1, l2) {
+  // rho = x*cos(theta) + y*sin(theta)
+  const c1 = Math.cos(l1.theta), s1 = Math.sin(l1.theta);
+  const c2 = Math.cos(l2.theta), s2 = Math.sin(l2.theta);
+  const det = c1*s2 - c2*s1;
+  if (Math.abs(det) < 1e-6) return { x: 0, y: 0 };
+  return {
+    x: (l1.rho*s2 - l2.rho*s1) / det,
+    y: (l2.rho*c1 - l1.rho*c2) / det
+  };
+}
+
+function isReasonableQuad(pts, W, H) {
+  // בדוק שכל 4 הנקודות בתוך תחומים סבירים וצורות מרובע
+  for (const p of pts)
+    if (p.x < -W*0.2 || p.x > W*1.2 || p.y < -H*0.2 || p.y > H*1.2) return false;
+  // בדוק שהשטח לא אפסי
+  const area = Math.abs(
+    (pts[0].x*(pts[1].y-pts[3].y) + pts[1].x*(pts[2].y-pts[0].y) +
+     pts[2].x*(pts[3].y-pts[1].y) + pts[3].x*(pts[0].y-pts[2].y)) / 2
+  );
+  return area > W * H * 0.05;
+}
+
+function defaultCorners(W, H) {
+  const m = 0.15;
+  return [
+    { x: W*m,     y: H*m },
+    { x: W*(1-m), y: H*m },
+    { x: W*(1-m), y: H*(1-m) },
+    { x: W*m,     y: H*(1-m) },
+  ];
+}
+
+// ------ ציור canvas ------
+function drawPerspCanvas() {
+  const canvas = document.getElementById('perspCanvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // רקע — הפריים שנלכד
+  ctx.drawImage(persp.frameGrabbed, 0, 0, W, H);
+
+  // צבע הפריים החצי-שקוף
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0, 0, W, H);
+
+  const pts = persp.points;
+  if (pts.length < 4) return;
+
+  // קווים בין הנקודות
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(122,201,232,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // מילוי חצי-שקוף
+  ctx.fillStyle = 'rgba(122,201,232,0.08)';
+  ctx.fill();
+
+  // נקודות גרירה
+  pts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 18, 0, Math.PI*2);
+    ctx.fillStyle = i === persp.dragging ? 'rgba(232,201,122,0.9)' : 'rgba(122,201,232,0.85)';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // מספר פינה
+    ctx.fillStyle = '#0d0d0f';
+    ctx.font = 'bold 13px Heebo, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i+1, p.x, p.y);
+  });
+}
+
+// ------ גרירת נקודות ------
+function setupPerspDrag() {
+  const canvas = document.getElementById('perspCanvas');
+
+  function ptFromEvent(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / r.width;
+    const scaleY = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
+  }
+
+  function nearest(pt) {
+    let best = -1, bestD = 40 * (canvas.width / window.innerWidth) * 1.5;
+    persp.points.forEach((p, i) => {
+      const d = Math.hypot(p.x - pt.x, p.y - pt.y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  function onDown(e) {
+    const pt = ptFromEvent(e);
+    persp.dragging = nearest(pt);
+    if (persp.dragging >= 0) e.preventDefault();
+  }
+  function onMove(e) {
+    if (persp.dragging < 0) return;
+    const pt = ptFromEvent(e);
+    persp.points[persp.dragging] = { x: pt.x, y: pt.y };
+    drawPerspCanvas();
+    e.preventDefault();
+  }
+  function onUp() { persp.dragging = -1; }
+
+  canvas.addEventListener('mousedown',  onDown);
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  canvas.addEventListener('mousemove',  onMove);
+  canvas.addEventListener('touchmove',  onMove, { passive: false });
+  canvas.addEventListener('mouseup',    onUp);
+  canvas.addEventListener('touchend',   onUp);
+}
+
+function resetPerspPoints() {
+  const c = document.getElementById('perspCanvas');
+  persp.points = defaultCorners(c.width, c.height);
+  drawPerspCanvas();
+}
+
+function skipPerspective() {
+  document.getElementById('perspective-overlay').style.display = 'none';
+  document.getElementById('camControls').style.display = 'flex';
+  document.getElementById('printFrame').style.display  = 'flex';
+  initFrame();
+  updateHUD();
+}
+
+// ------ Perspective Transform + Homography ------
+function applyPerspective() {
+  const src = persp.points; // 4 פינות שהמשתמש הגדיר על הקיר
+  if (src.length < 4) { skipPerspective(); return; }
+
+  // חשב את גודל היעד מהגודל הממוצע של הצלעות
+  const wTop    = Math.hypot(src[1].x-src[0].x, src[1].y-src[0].y);
+  const wBottom = Math.hypot(src[2].x-src[3].x, src[2].y-src[3].y);
+  const hLeft   = Math.hypot(src[3].x-src[0].x, src[3].y-src[0].y);
+  const hRight  = Math.hypot(src[2].x-src[1].x, src[2].y-src[1].y);
+  const dstW = Math.round((wTop + wBottom) / 2);
+  const dstH = Math.round((hLeft + hRight) / 2);
+
+  // נקודות יעד (מרובע ישר)
+  const dst = [
+    { x: 0,    y: 0    },
+    { x: dstW, y: 0    },
+    { x: dstW, y: dstH },
+    { x: 0,    y: dstH },
+  ];
+
+  // חשב homography H מ-src ל-dst
+  const H = computeHomography(src, dst);
+  if (!H) { skipPerspective(); return; }
+
+  // שמור homography ב-state לשימוש בציור הframe
+  state.homography = H;
+  state.perspSrc   = src;
+  state.perspDstW  = dstW;
+  state.perspDstH  = dstH;
+
+  document.getElementById('perspective-overlay').style.display = 'none';
+  document.getElementById('camControls').style.display = 'flex';
+  document.getElementById('printFrame').style.display  = 'flex';
+  initFrame();
+  updateHUD();
+}
+
+// DLT homography — 4 נקודות התאמה
+function computeHomography(src, dst) {
+  // בונה מטריצת A (8x9) ופותר SVD
+  const A = [];
+  for (let i = 0; i < 4; i++) {
+    const {x: sx, y: sy} = src[i];
+    const {x: dx, y: dy} = dst[i];
+    A.push([-sx,-sy,-1, 0,0,0, dx*sx, dx*sy, dx]);
+    A.push([ 0,0,0, -sx,-sy,-1, dy*sx, dy*sy, dy]);
+  }
+  // פתרון עם SVD מינימלי — נשתמש בשיטת pseudo-inverse דרך least-squares
+  // לאותה מטרה ב-JS טהור נשתמש ב-QR decomposition פשוטה
+  const h = solveHomLS(A);
+  if (!h) return null;
+  return [
+    [h[0],h[1],h[2]],
+    [h[3],h[4],h[5]],
+    [h[6],h[7],1]
+  ];
+}
+
+function solveHomLS(A) {
+  // Gaussian elimination על A^T * A * h = 0 עם constraint h[8]=1
+  // שיטה פשוטה: נסדר ל-8 משוואות עם h[8]=1 ידוע
+  const B = A.map(row => [...row.slice(0,8), -row[8]]);
+  // Gauss elimination
+  const n = 8;
+  const M = B.map(r => [...r]);
+  const b = B.map(r => r[8]);
+  // Build 8x8 normal equations A'A x = A'b
+  const AtA = Array.from({length:n}, () => new Array(n).fill(0));
+  const Atb = new Array(n).fill(0);
+  for (const row of A) {
+    for (let i = 0; i < n; i++) {
+      Atb[i] -= row[i] * row[8];
+      for (let j = 0; j < n; j++) AtA[i][j] += row[i] * row[j];
+    }
+  }
+  // Gauss elimination on AtA * x = Atb
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let r = col+1; r < n; r++) if (Math.abs(AtA[r][col]) > Math.abs(AtA[maxRow][col])) maxRow = r;
+    [AtA[col], AtA[maxRow]] = [AtA[maxRow], AtA[col]];
+    [Atb[col], Atb[maxRow]] = [Atb[maxRow], Atb[col]];
+    if (Math.abs(AtA[col][col]) < 1e-10) return null;
+    const sc = AtA[col][col];
+    for (let j = col; j < n; j++) AtA[col][j] /= sc;
+    Atb[col] /= sc;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = AtA[r][col];
+      for (let j = col; j < n; j++) AtA[r][j] -= f * AtA[col][j];
+      Atb[r] -= f * Atb[col];
+    }
+  }
+  return [...Atb, 1];
+}
+
+// החל homography על נקודה
+function applyH(H, x, y) {
+  const w = H[2][0]*x + H[2][1]*y + H[2][2];
+  return {
+    x: (H[0][0]*x + H[0][1]*y + H[0][2]) / w,
+    y: (H[1][0]*x + H[1][1]*y + H[1][2]) / w,
+  };
+}
+
+// ====================================================
+// V1 — ציור frame עם perspective transform
+// ====================================================
+// override applyFrame כך שאם יש homography — משתמשים בו
+const _applyFrameOriginal = applyFrame;
+function applyFrame() {
+  _applyFrameOriginal();
+  if (state.homography) applyPerspToFrame();
+}
+
+function applyPerspToFrame() {
+  // חשב 4 פינות המסגרת במרחב המסך
+  const x0 = state.frameX, y0 = state.frameY;
+  const x1 = x0 + state.frameW, y1 = y0 + state.frameH;
+  const corners = [{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}];
+
+  // המר לקואורדינטות canvas (הפריים שנלכד)
+  const cw = persp.frameGrabbed?.width  || window.innerWidth;
+  const ch = persp.frameGrabbed?.height || window.innerHeight;
+  const sw = document.getElementById('camera-screen').clientWidth;
+  const sh = document.getElementById('camera-screen').clientHeight;
+  const sx = cw / sw, sy = ch / sh;
+
+  // החל homography הפוך (dst → src) לקבלת הנקודות על הקיר
+  // כאן H הוא src→dst, אז נצטרך H^-1 לבדוק איפה הפינות נופלות
+  // לצורך CSS transform, נחשב clip-path polygon עם הנקודות המשוכות
+  const Hinv = invertH(state.homography);
+  if (!Hinv) return;
+
+  // פינות ב-dst space
+  const dw = state.perspDstW, dh = state.perspDstH;
+  // מיפוי: המסגרת (בקואורדינטות מסך) → dst space → src space (מסך)
+  const ratio_x = dw / (state.frameW * sx);
+  const ratio_y = dh / (state.frameH * sy);
+
+  const mapped = corners.map(c => {
+    const dx = (c.x * sx / cw) * dw;
+    const dy = (c.y * sy / ch) * dh;
+    const sp = applyH(Hinv, dx, dy);
+    return { x: sp.x / sx, y: sp.y / sy };
+  });
+
+  // החל clip-path על frame
+  const frame = document.getElementById('printFrame');
+  const poly  = mapped.map(p => `${(p.x-state.frameX).toFixed(1)}px ${(p.y-state.frameY).toFixed(1)}px`).join(', ');
+
+  // שנה CSS transform ל-perspective skew
+  // הדרך הנכונה: CSS perspective transform matrix מ-4 נקודות
+  const cssMatrix = perspectiveCSSMatrix(
+    state.frameW, state.frameH,
+    mapped
+  );
+  if (cssMatrix) {
+    frame.style.transform = `matrix3d(${cssMatrix})`;
+  }
+}
+
+function invertH(H) {
+  const [[a,b,c],[d,e,f],[g,h,i]] = H;
+  const det = a*(e*i-f*h) - b*(d*i-f*g) + c*(d*h-e*g);
+  if (Math.abs(det) < 1e-10) return null;
+  const inv = [
+    [(e*i-f*h)/det, (c*h-b*i)/det, (b*f-c*e)/det],
+    [(f*g-d*i)/det, (a*i-c*g)/det, (c*d-a*f)/det],
+    [(d*h-e*g)/det, (b*g-a*h)/det, (a*e-b*d)/det],
+  ];
+  return inv;
+}
+
+// חישוב CSS matrix3d מ-4 נקודות יעד
+// src: מלבן (0,0,w,h) → dst: 4 נקודות произвольные
+function perspectiveCSSMatrix(w, h, dst) {
+  // src points
+  const s = [{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}];
+  const H = computeHomography(s, dst.map(p => ({x: p.x - state.frameX, y: p.y - state.frameY})));
+  if (!H) return null;
+  // CSS matrix3d (column-major, 4x4)
+  const [[h11,h12,h13],[h21,h22,h23],[h31,h32,h33]] = H;
+  return [
+    h11,  h21,  0, h31,
+    h12,  h22,  0, h32,
+    0,    0,    1, 0,
+    h13,  h23,  0, h33
+  ].map(v => v.toFixed(8)).join(',');
+}
+
+// ====================================================
+function setupDrag() {
+  const frame  = document.getElementById('printFrame');
+  const handle = document.getElementById('resizeHandle');
+  let dragging = false, resizing = false;
+  let startX, startY, startFX, startFY, startFW, startFH;
+
+  function onDown(e) {
+    if (e.target === handle || handle.contains(e.target)) return;
+    dragging = true;
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX; startY = pt.clientY;
+    startFX = state.frameX; startFY = state.frameY;
+    e.preventDefault();
+  }
+  function onMove(e) {
+    const pt = e.touches ? e.touches[0] : e;
+    if (dragging) {
+      state.frameX = startFX + pt.clientX - startX;
+      state.frameY = startFY + pt.clientY - startY;
+      applyFrame();
+    }
+    if (resizing) {
+      const newW = Math.max(40, startFW + pt.clientX - startX);
+      const newH = Math.max(40, startFH + pt.clientY - startY);
+      state.frameW = newW; state.frameH = newH;
+      state.printW = newW / state.pxPerCm;
+      state.printH = newH / state.pxPerCm;
+      applyFrame(); updateHUD(); syncSliders();
+    }
+    e.preventDefault();
+  }
+  function onUp() { dragging = false; resizing = false; }
+
+  frame.addEventListener('mousedown', onDown);
+  frame.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup', onUp);
+  document.addEventListener('touchend', onUp);
+
+  handle.addEventListener('mousedown', (e) => {
+    resizing = true; startX = e.clientX; startY = e.clientY;
+    startFW = state.frameW; startFH = state.frameH;
+    e.stopPropagation(); e.preventDefault();
+  });
+  handle.addEventListener('touchstart', (e) => {
+    resizing = true;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    startFW = state.frameW; startFH = state.frameH;
+    e.stopPropagation(); e.preventDefault();
+  }, { passive: false });
+}
+
+// ===== SLIDERS =====
+function setupSliders() { syncSliders(); }
+function syncSliders() {
+  document.getElementById('sliderW').value = state.printW.toFixed(0);
+  document.getElementById('sliderH').value = state.printH.toFixed(0);
+  document.getElementById('valW').textContent = state.printW.toFixed(0) + 'cm';
+  document.getElementById('valH').textContent = state.printH.toFixed(0) + 'cm';
+}
+function onSliderW() {
+  const w = parseFloat(document.getElementById('sliderW').value);
+  state.printW = w;
+  if (state.locked) state.printH = w / state.imageAspect;
+  state.frameW = state.printW * state.pxPerCm;
+  state.frameH = state.printH * state.pxPerCm;
+  applyFrame(); syncSliders(); updateHUD();
+}
+function onSliderH() {
+  const h = parseFloat(document.getElementById('sliderH').value);
+  state.printH = h;
+  if (state.locked) state.printW = h * state.imageAspect;
+  state.frameW = state.printW * state.pxPerCm;
+  state.frameH = state.printH * state.pxPerCm;
+  applyFrame(); syncSliders(); updateHUD();
+}
+
+// ===== CAPTURE =====
+function capturePhoto() {
+  const video     = document.getElementById('video');
+  const canvas    = document.getElementById('captured-canvas');
+  const camScreen = document.getElementById('camera-screen');
+
+  canvas.width  = video.videoWidth  || camScreen.clientWidth;
+  canvas.height = video.videoHeight || camScreen.clientHeight;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const scaleX = canvas.width  / camScreen.clientWidth;
+  const scaleY = canvas.height / camScreen.clientHeight;
+
+  const cx = (state.frameX + state.frameW / 2) * scaleX;
+  const cy = (state.frameY + state.frameH / 2) * scaleY;
+  const fw = state.frameW * scaleX;
+  const fh = state.frameH * scaleY;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(state.frameRotation * Math.PI / 180);
+  const img = new Image();
+  img.src = state.imageSrc;
+  ctx.drawImage(img, -fw/2, -fh/2, fw, fh);
+  ctx.strokeStyle = 'rgba(232,201,122,0.8)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-fw/2, -fh/2, fw, fh);
+  ctx.restore();
+
+  const lx = state.frameX * scaleX;
+  const ly = (state.frameY + state.frameH) * scaleY + 4;
+  ctx.fillStyle = 'rgba(13,13,15,0.75)';
+  ctx.fillRect(lx, ly, 130, 20);
+  ctx.fillStyle = '#e8c97a';
+  ctx.font = '12px Space Mono, monospace';
+  ctx.fillText(`${state.printW.toFixed(0)}×${state.printH.toFixed(0)} cm`, lx + 6, ly + 14);
+
+  showScreen('captured-screen');
+}
+
+function backToCamera() { showScreen('camera-screen'); }
+
+function savePhoto() {
+  const canvas = document.getElementById('captured-canvas');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/jpeg', 0.92);
+  a.download = `print-preview-${state.printW.toFixed(0)}x${state.printH.toFixed(0)}cm.jpg`;
+  a.click();
+}
+
+async function sharePhoto() {
+  const canvas = document.getElementById('captured-canvas');
+  canvas.toBlob(async (blob) => {
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], 'print-preview.jpg', { type: 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'תצוגה מקדימה להדפסה' });
+        return;
+      }
+    }
+    savePhoto();
+  }, 'image/jpeg', 0.92);
+}
+</script>
+</body>
+</html>
