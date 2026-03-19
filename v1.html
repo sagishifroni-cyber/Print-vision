@@ -1207,8 +1207,9 @@ function applyFrame() {
   frame.style.height = state.frameH + 'px';
   frame.style.left   = state.frameX + 'px';
   frame.style.top    = state.frameY + 'px';
-  frame.style.transform = `rotate(${state.frameRotation}deg)`;
+  frame.style.transform = state.homography ? '' : `rotate(${state.frameRotation}deg)`;
   updateFrameLabel();
+  if (state.homography) applyFramePersp();
 }
 
 function updateFrameLabel() {
@@ -1268,507 +1269,239 @@ function rotateImageFrame() {
 // ====================================================
 // V1 — PERSPECTIVE ENGINE
 // ====================================================
+// הלוגיקה:
+// המשתמש מסמן מרובע שברמציאות הוא ישר (אריח/לוח/חלון).
+// H ממפה את 4 הנקודות הללו למרובע ישר.
+// מיישמים את אותה טרנספורמציה על תמונת ההדפסה כ-CSS matrix3d.
+// הגודל נשמר לפי pxPerCm מהכיול.
+// ====================================================
 
-const persp = {
-  points: [],        // 4 x {x,y} — פינות הקיר שהמשתמש מגדיר
-  dragging: -1,      // index של נקודה שנגררת
-  frameGrabbed: null // ImageData של הפריים שנלכד לניתוח
-};
+const persp = { points:[], dragging:-1, snap:null };
 
-// ------ שלב perspective: לכוד פריים, זהה קווים, הצג נקודות ------
 function startPerspectiveStep() {
   const video  = document.getElementById('video');
   const canvas = document.getElementById('perspCanvas');
-  const W = canvas.width  = video.videoWidth  || window.innerWidth;
-  const H = canvas.height = video.videoHeight || window.innerHeight;
+  canvas.width  = video.clientWidth  || window.innerWidth;
+  canvas.height = video.clientHeight || window.innerHeight;
 
-  // לכוד פריים נוכחי
-  const tmp = document.createElement('canvas');
-  tmp.width = W; tmp.height = H;
-  tmp.getContext('2d').drawImage(video, 0, 0, W, H);
-  persp.frameGrabbed = tmp;
+  // snapshot לרקע
+  const snap = document.createElement('canvas');
+  snap.width = canvas.width; snap.height = canvas.height;
+  snap.getContext('2d').drawImage(video, 0, 0, snap.width, snap.height);
+  persp.snap = snap;
 
   document.getElementById('perspective-overlay').style.display = 'block';
-
-  // נסה לזהות קוווים אוטומטית
-  const pts = detectWallCorners(tmp);
-  persp.points = pts;
+  persp.points = detectWallQuad(snap);
   drawPerspCanvas();
   setupPerspDrag();
 }
 
-// ------ Canny-lite + Hough Transform ------
-function detectWallCorners(srcCanvas) {
-  const W = srcCanvas.width, H = srcCanvas.height;
-  const ctx = srcCanvas.getContext('2d');
-  const src = ctx.getImageData(0, 0, W, H);
+function detectWallQuad(src) {
+  const W = src.width, H = src.height;
+  const scale = Math.min(1, 400 / Math.max(W, H));
+  const sw = Math.round(W*scale), sh = Math.round(H*scale);
+  const tmp = document.createElement('canvas');
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext('2d').drawImage(src, 0, 0, sw, sh);
+  const data = tmp.getContext('2d').getImageData(0, 0, sw, sh).data;
 
-  // 1. Grayscale
-  const gray = new Float32Array(W * H);
-  for (let i = 0; i < W * H; i++) {
-    const p = i * 4;
-    gray[i] = 0.299 * src.data[p] + 0.587 * src.data[p+1] + 0.114 * src.data[p+2];
-  }
+  const gray = new Float32Array(sw*sh);
+  for (let i = 0; i < sw*sh; i++)
+    gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
 
-  // 2. Gaussian blur 5x5
-  const blurred = gaussianBlur(gray, W, H);
-
-  // 3. Sobel edge magnitude
-  const edges = sobelEdges(blurred, W, H);
-
-  // 4. Threshold — שמור רק קצוות חזקים
-  const thresh = new Uint8Array(W * H);
+  const edges = new Float32Array(sw*sh);
   let maxE = 0;
-  for (let i = 0; i < edges.length; i++) if (edges[i] > maxE) maxE = edges[i];
-  const T = maxE * 0.18;
-  for (let i = 0; i < edges.length; i++) thresh[i] = edges[i] > T ? 255 : 0;
+  for (let y=1;y<sh-1;y++) for (let x=1;x<sw-1;x++) {
+    const gx = -gray[(y-1)*sw+x-1]+gray[(y-1)*sw+x+1]-2*gray[y*sw+x-1]+2*gray[y*sw+x+1]-gray[(y+1)*sw+x-1]+gray[(y+1)*sw+x+1];
+    const gy = -gray[(y-1)*sw+x-1]-2*gray[(y-1)*sw+x]-gray[(y-1)*sw+x+1]+gray[(y+1)*sw+x-1]+2*gray[(y+1)*sw+x]+gray[(y+1)*sw+x+1];
+    edges[y*sw+x] = Math.sqrt(gx*gx+gy*gy);
+    if (edges[y*sw+x]>maxE) maxE=edges[y*sw+x];
+  }
+  const thresh = new Uint8Array(sw*sh);
+  const T = maxE*0.20;
+  for (let i=0;i<edges.length;i++) thresh[i]=edges[i]>T?1:0;
 
-  // 5. Hough Transform — מצא קוווים ישרים
-  const lines = houghLines(thresh, W, H, 80);
-
-  // 6. מצא 4 פינות קיר מהקוווים
-  return cornersFromLines(lines, W, H);
-}
-
-function gaussianBlur(gray, W, H) {
-  const kernel = [2,4,5,4,2, 4,9,12,9,4, 5,12,15,12,5, 4,9,12,9,4, 2,4,5,4,2];
-  const kSum = 159;
-  const out = new Float32Array(W * H);
-  for (let y = 2; y < H-2; y++) {
-    for (let x = 2; x < W-2; x++) {
-      let s = 0;
-      for (let ky = -2; ky <= 2; ky++)
-        for (let kx = -2; kx <= 2; kx++)
-          s += gray[(y+ky)*W + (x+kx)] * kernel[(ky+2)*5 + (kx+2)];
-      out[y*W+x] = s / kSum;
+  const diag=Math.ceil(Math.sqrt(sw*sw+sh*sh)), nT=180, nR=diag*2;
+  const acc=new Int32Array(nT*nR);
+  const cosA=new Float32Array(nT), sinA=new Float32Array(nT);
+  for (let t=0;t<nT;t++){cosA[t]=Math.cos(t*Math.PI/nT);sinA[t]=Math.sin(t*Math.PI/nT);}
+  for (let y=0;y<sh;y++) for (let x=0;x<sw;x++) {
+    if (!thresh[y*sw+x]) continue;
+    for (let t=0;t<nT;t++){const r=Math.round(x*cosA[t]+y*sinA[t])+diag;if(r>=0&&r<nR)acc[t*nR+r]++;}
+  }
+  const minV = Math.max(20, sw*0.12);
+  const lines=[];
+  for (let t=0;t<nT;t++) for (let r=1;r<nR-1;r++){
+    const v=acc[t*nR+r]; if(v<minV) continue;
+    let ok=true;
+    outer: for(let dt=-3;dt<=3;dt++) for(let dr=-3;dr<=3;dr++){
+      if(!dt&&!dr)continue; const nt=(t+dt+nT)%nT,nr=r+dr;
+      if(nr>=0&&nr<nR&&acc[nt*nR+nr]>=v){ok=false;break outer;}
     }
+    if(ok) lines.push({t,r:r-diag,v,theta:t*Math.PI/nT,c:cosA[t],s:sinA[t]});
   }
-  return out;
-}
+  lines.sort((a,b)=>b.v-a.v);
 
-function sobelEdges(gray, W, H) {
-  const out = new Float32Array(W * H);
-  for (let y = 1; y < H-1; y++) {
-    for (let x = 1; x < W-1; x++) {
-      const gx =
-        -gray[(y-1)*W+(x-1)] + gray[(y-1)*W+(x+1)]
-        -2*gray[y*W+(x-1)]   + 2*gray[y*W+(x+1)]
-        -gray[(y+1)*W+(x-1)] + gray[(y+1)*W+(x+1)];
-      const gy =
-        -gray[(y-1)*W+(x-1)] - 2*gray[(y-1)*W+x] - gray[(y-1)*W+(x+1)]
-        +gray[(y+1)*W+(x-1)] + 2*gray[(y+1)*W+x] + gray[(y+1)*W+(x+1)];
-      out[y*W+x] = Math.sqrt(gx*gx + gy*gy);
-    }
+  const horiz=lines.filter(l=>l.t<30||l.t>150).slice(0,6);
+  const vert =lines.filter(l=>l.t>=60&&l.t<=120).slice(0,6);
+  const h=pickPair(horiz,sh), v=pickPair(vert,sw);
+  if(!h||!v) return defaultQuad(W,H);
+
+  function ix(l1,l2){
+    const det=l1.c*l2.s-l2.c*l1.s;
+    if(Math.abs(det)<1e-6) return {x:0,y:0};
+    return {x:(l1.r*l2.s-l2.r*l1.s)/det, y:(l2.r*l1.c-l1.r*l2.c)/det};
   }
-  return out;
+  const pts=[ix(h[0],v[0]),ix(h[0],v[1]),ix(h[1],v[1]),ix(h[1],v[0])]
+    .map(p=>({x:Math.max(20,Math.min(W-20,p.x/scale)),y:Math.max(20,Math.min(H-20,p.y/scale))}));
+  const area=Math.abs(pts[0].x*(pts[1].y-pts[3].y)+pts[1].x*(pts[2].y-pts[0].y)+pts[2].x*(pts[3].y-pts[1].y)+pts[3].x*(pts[0].y-pts[2].y))/2;
+  return area>W*H*0.04 ? pts : defaultQuad(W,H);
 }
 
-function houghLines(thresh, W, H, minVotes) {
-  const diag   = Math.ceil(Math.sqrt(W*W + H*H));
-  const nTheta = 180;
-  const nRho   = diag * 2;
-  const acc    = new Int32Array(nTheta * nRho);
-  const cosT   = [], sinT = [];
-  for (let t = 0; t < nTheta; t++) {
-    const rad = t * Math.PI / nTheta;
-    cosT[t] = Math.cos(rad); sinT[t] = Math.sin(rad);
-  }
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (!thresh[y*W+x]) continue;
-      for (let t = 0; t < nTheta; t++) {
-        const rho = Math.round(x * cosT[t] + y * sinT[t]) + diag;
-        if (rho >= 0 && rho < nRho) acc[t * nRho + rho]++;
-      }
-    }
-  }
-  // מצא פיקים
-  const lines = [];
-  for (let t = 0; t < nTheta; t++) {
-    for (let r = 0; r < nRho; r++) {
-      const v = acc[t * nRho + r];
-      if (v < minVotes) continue;
-      // non-max suppression בחלון 5x5
-      let isMax = true;
-      for (let dt = -2; dt <= 2 && isMax; dt++)
-        for (let dr = -2; dr <= 2 && isMax; dr++) {
-          const nt = t+dt, nr = r+dr;
-          if (nt>=0 && nt<nTheta && nr>=0 && nr<nRho && (dt||dr))
-            if (acc[nt*nRho+nr] >= v) isMax = false;
-        }
-      if (isMax) lines.push({ theta: t * Math.PI / nTheta, rho: r - diag, votes: v });
-    }
-  }
-  lines.sort((a,b) => b.votes - a.votes);
-  return lines.slice(0, 20);
+function pickPair(lines,dim){
+  for(let i=0;i<lines.length;i++) for(let j=i+1;j<lines.length;j++)
+    if(Math.abs(lines[i].r-lines[j].r)>dim*0.15) return [lines[i],lines[j]];
+  return null;
 }
 
-// מחזיר 4 פינות מהקוווים — intersection של זוגות קוווים
-function cornersFromLines(lines, W, H) {
-  // מפריד לקוווים אופקיים ואנכיים לפי זווית
-  const horiz = lines.filter(l => {
-    const deg = l.theta * 180 / Math.PI;
-    return deg < 30 || deg > 150;
-  });
-  const vert = lines.filter(l => {
-    const deg = l.theta * 180 / Math.PI;
-    return deg >= 30 && deg <= 150;
-  });
-
-  // fallback אם לא נמצאו קוווים מספיקים
-  if (horiz.length < 2 || vert.length < 2) {
-    return defaultCorners(W, H);
-  }
-
-  // לקח 2 קוווים אופקיים ו-2 אנכיים עם הכי הרבה votes
-  const h1 = horiz[0], h2 = horiz[1];
-  const v1 = vert[0],  v2 = vert[1];
-
-  const pts = [
-    lineIntersect(h1, v1),
-    lineIntersect(h1, v2),
-    lineIntersect(h2, v2),
-    lineIntersect(h2, v1),
-  ].map(p => ({
-    x: Math.max(10, Math.min(W-10, p.x)),
-    y: Math.max(10, Math.min(H-10, p.y))
-  }));
-
-  // אם הנקודות לא יוצרות מרובע סביר — fallback
-  if (!isReasonableQuad(pts, W, H)) return defaultCorners(W, H);
-  return pts;
+function defaultQuad(W,H){
+  const mx=W*0.2,my=H*0.2;
+  return [{x:mx,y:my},{x:W-mx,y:my},{x:W-mx,y:H-my},{x:mx,y:H-my}];
 }
 
-function lineIntersect(l1, l2) {
-  // rho = x*cos(theta) + y*sin(theta)
-  const c1 = Math.cos(l1.theta), s1 = Math.sin(l1.theta);
-  const c2 = Math.cos(l2.theta), s2 = Math.sin(l2.theta);
-  const det = c1*s2 - c2*s1;
-  if (Math.abs(det) < 1e-6) return { x: 0, y: 0 };
-  return {
-    x: (l1.rho*s2 - l2.rho*s1) / det,
-    y: (l2.rho*c1 - l1.rho*c2) / det
-  };
-}
-
-function isReasonableQuad(pts, W, H) {
-  // בדוק שכל 4 הנקודות בתוך תחומים סבירים וצורות מרובע
-  for (const p of pts)
-    if (p.x < -W*0.2 || p.x > W*1.2 || p.y < -H*0.2 || p.y > H*1.2) return false;
-  // בדוק שהשטח לא אפסי
-  const area = Math.abs(
-    (pts[0].x*(pts[1].y-pts[3].y) + pts[1].x*(pts[2].y-pts[0].y) +
-     pts[2].x*(pts[3].y-pts[1].y) + pts[3].x*(pts[0].y-pts[2].y)) / 2
-  );
-  return area > W * H * 0.05;
-}
-
-function defaultCorners(W, H) {
-  const m = 0.15;
-  return [
-    { x: W*m,     y: H*m },
-    { x: W*(1-m), y: H*m },
-    { x: W*(1-m), y: H*(1-m) },
-    { x: W*m,     y: H*(1-m) },
-  ];
-}
-
-// ------ ציור canvas ------
-function drawPerspCanvas() {
-  const canvas = document.getElementById('perspCanvas');
-  const ctx    = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-
-  // רקע — הפריים שנלכד
-  ctx.drawImage(persp.frameGrabbed, 0, 0, W, H);
-
-  // צבע הפריים החצי-שקוף
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fillRect(0, 0, W, H);
-
-  const pts = persp.points;
-  if (pts.length < 4) return;
-
-  // קווים בין הנקודות
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.closePath();
-  ctx.strokeStyle = 'rgba(122,201,232,0.9)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // מילוי חצי-שקוף
-  ctx.fillStyle = 'rgba(122,201,232,0.08)';
-  ctx.fill();
-
-  // נקודות גרירה
-  pts.forEach((p, i) => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 18, 0, Math.PI*2);
-    ctx.fillStyle = i === persp.dragging ? 'rgba(232,201,122,0.9)' : 'rgba(122,201,232,0.85)';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // מספר פינה
-    ctx.fillStyle = '#0d0d0f';
-    ctx.font = 'bold 13px Heebo, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(i+1, p.x, p.y);
+function drawPerspCanvas(){
+  const canvas=document.getElementById('perspCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.drawImage(persp.snap,0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(0,0,W,H);
+  const pts=persp.points; if(pts.length<4) return;
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath();
+  ctx.fillStyle='rgba(122,201,232,0.12)'; ctx.fill();
+  ctx.strokeStyle='rgba(122,201,232,0.9)'; ctx.lineWidth=2; ctx.stroke();
+  const TOUCH_R=Math.round(Math.min(W,H)*0.07);
+  pts.forEach((p,i)=>{
+    // אזור גרירה גדול (שקוף)
+    ctx.beginPath(); ctx.arc(p.x,p.y,TOUCH_R,0,Math.PI*2);
+    ctx.fillStyle=i===persp.dragging?'rgba(232,201,122,0.2)':'rgba(122,201,232,0.1)'; ctx.fill();
+    // נקודה נראית
+    ctx.beginPath(); ctx.arc(p.x,p.y,16,0,Math.PI*2);
+    ctx.fillStyle=i===persp.dragging?'#e8c97a':'#7ac9e8';
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#0d0d0f'; ctx.font='bold 13px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(i+1,p.x,p.y);
   });
 }
 
-// ------ גרירת נקודות ------
-function setupPerspDrag() {
-  const canvas = document.getElementById('perspCanvas');
-
-  function ptFromEvent(e) {
-    const r = canvas.getBoundingClientRect();
-    const scaleX = canvas.width  / r.width;
-    const scaleY = canvas.height / r.height;
-    const src = e.touches ? e.touches[0] : e;
-    return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
+function setupPerspDrag(){
+  const canvas=document.getElementById('perspCanvas');
+  function pos(e){
+    const r=canvas.getBoundingClientRect(), sc=e.touches?e.touches[0]:e;
+    return {x:(sc.clientX-r.left)*(canvas.width/r.width), y:(sc.clientY-r.top)*(canvas.height/r.height)};
   }
-
-  function nearest(pt) {
-    let best = -1, bestD = 40 * (canvas.width / window.innerWidth) * 1.5;
-    persp.points.forEach((p, i) => {
-      const d = Math.hypot(p.x - pt.x, p.y - pt.y);
-      if (d < bestD) { bestD = d; best = i; }
-    });
+  function nearest(pt){
+    const R=Math.min(canvas.width,canvas.height)*0.1;
+    let best=-1,bestD=R;
+    persp.points.forEach((p,i)=>{const d=Math.hypot(p.x-pt.x,p.y-pt.y);if(d<bestD){bestD=d;best=i;}});
     return best;
   }
+  function clamp(pt){return {x:Math.max(10,Math.min(canvas.width-10,pt.x)),y:Math.max(10,Math.min(canvas.height-10,pt.y))};}
+  canvas.addEventListener('mousedown', e=>{persp.dragging=nearest(pos(e));e.preventDefault();});
+  canvas.addEventListener('touchstart',e=>{persp.dragging=nearest(pos(e));e.preventDefault();},{passive:false});
+  canvas.addEventListener('mousemove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspCanvas();e.preventDefault();});
+  canvas.addEventListener('touchmove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspCanvas();e.preventDefault();},{passive:false});
+  canvas.addEventListener('mouseup',  ()=>{persp.dragging=-1;});
+  canvas.addEventListener('touchend', ()=>{persp.dragging=-1;});
+}
 
-  function onDown(e) {
-    const pt = ptFromEvent(e);
-    persp.dragging = nearest(pt);
-    if (persp.dragging >= 0) e.preventDefault();
+function resetPerspPoints(){
+  const c=document.getElementById('perspCanvas');
+  persp.points=defaultQuad(c.width,c.height); drawPerspCanvas();
+}
+
+function skipPerspective(){
+  state.homography=null;
+  document.getElementById('perspective-overlay').style.display='none';
+  document.getElementById('camControls').style.display='flex';
+  document.getElementById('printFrame').style.display='flex';
+  initFrame(); updateHUD();
+}
+
+function applyPerspective(){
+  const src=persp.points; if(src.length<4){skipPerspective();return;}
+  const wAvg=(Math.hypot(src[1].x-src[0].x,src[1].y-src[0].y)+Math.hypot(src[2].x-src[3].x,src[2].y-src[3].y))/2;
+  const hAvg=(Math.hypot(src[3].x-src[0].x,src[3].y-src[0].y)+Math.hypot(src[2].x-src[1].x,src[2].y-src[1].y))/2;
+  const dst=[{x:0,y:0},{x:wAvg,y:0},{x:wAvg,y:hAvg},{x:0,y:hAvg}];
+  state.homography=computeHomography(src,dst);
+  state.perspW=wAvg; state.perspH=hAvg;
+  document.getElementById('perspective-overlay').style.display='none';
+  document.getElementById('camControls').style.display='flex';
+  document.getElementById('printFrame').style.display='flex';
+  initFrame(); updateHUD();
+}
+
+function computeHomography(src,dst){
+  const A=[];
+  for(let i=0;i<4;i++){
+    const{x:sx,y:sy}=src[i],{x:dx,y:dy}=dst[i];
+    A.push([-sx,-sy,-1,0,0,0,dx*sx,dx*sy,dx]);
+    A.push([0,0,0,-sx,-sy,-1,dy*sx,dy*sy,dy]);
   }
-  function onMove(e) {
-    if (persp.dragging < 0) return;
-    const pt = ptFromEvent(e);
-    persp.points[persp.dragging] = { x: pt.x, y: pt.y };
-    drawPerspCanvas();
-    e.preventDefault();
+  const n=8;
+  const AtA=Array.from({length:n},()=>new Float64Array(n));
+  const Atb=new Float64Array(n);
+  for(const row of A){
+    for(let i=0;i<n;i++){Atb[i]-=row[i]*row[8];for(let j=0;j<n;j++)AtA[i][j]+=row[i]*row[j];}
   }
-  function onUp() { persp.dragging = -1; }
-
-  canvas.addEventListener('mousedown',  onDown);
-  canvas.addEventListener('touchstart', onDown, { passive: false });
-  canvas.addEventListener('mousemove',  onMove);
-  canvas.addEventListener('touchmove',  onMove, { passive: false });
-  canvas.addEventListener('mouseup',    onUp);
-  canvas.addEventListener('touchend',   onUp);
+  for(let c=0;c<n;c++){
+    let mr=c; for(let r=c+1;r<n;r++) if(Math.abs(AtA[r][c])>Math.abs(AtA[mr][c]))mr=r;
+    [AtA[c],AtA[mr]]=[AtA[mr],AtA[c]]; [Atb[c],Atb[mr]]=[Atb[mr],Atb[c]];
+    if(Math.abs(AtA[c][c])<1e-12)return null;
+    const s=AtA[c][c]; for(let j=c;j<n;j++)AtA[c][j]/=s; Atb[c]/=s;
+    for(let r=0;r<n;r++){if(r===c)continue;const f=AtA[r][c];for(let j=c;j<n;j++)AtA[r][j]-=f*AtA[c][j];Atb[r]-=f*Atb[c];}
+  }
+  const h=[...Atb,1];
+  return [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],h[8]]];
 }
 
-function resetPerspPoints() {
-  const c = document.getElementById('perspCanvas');
-  persp.points = defaultCorners(c.width, c.height);
-  drawPerspCanvas();
+function applyHom(H,x,y){
+  const w=H[2][0]*x+H[2][1]*y+H[2][2];
+  return{x:(H[0][0]*x+H[0][1]*y+H[0][2])/w, y:(H[1][0]*x+H[1][1]*y+H[1][2])/w};
 }
 
-function skipPerspective() {
-  document.getElementById('perspective-overlay').style.display = 'none';
-  document.getElementById('camControls').style.display = 'flex';
-  document.getElementById('printFrame').style.display  = 'flex';
-  initFrame();
-  updateHUD();
+// בונה CSS matrix3d מ-src מלבן (0,0,fw,fh) → dst 4 נקודות
+function buildCSS3d(fw,fh,dst){
+  const src=[{x:0,y:0},{x:fw,y:0},{x:fw,y:fh},{x:0,y:fh}];
+  const H=computeHomography(src,dst); if(!H)return null;
+  const[[a,b,c],[d,e,f],[g,h,i]]=H;
+  return[a,d,0,g,b,e,0,h,0,0,1,0,c,f,0,i].map(v=>v.toFixed(8)).join(',');
 }
 
-// ------ Perspective Transform + Homography ------
-function applyPerspective() {
-  const src = persp.points; // 4 פינות שהמשתמש הגדיר על הקיר
-  if (src.length < 4) { skipPerspective(); return; }
-
-  // חשב את גודל היעד מהגודל הממוצע של הצלעות
-  const wTop    = Math.hypot(src[1].x-src[0].x, src[1].y-src[0].y);
-  const wBottom = Math.hypot(src[2].x-src[3].x, src[2].y-src[3].y);
-  const hLeft   = Math.hypot(src[3].x-src[0].x, src[3].y-src[0].y);
-  const hRight  = Math.hypot(src[2].x-src[1].x, src[2].y-src[1].y);
-  const dstW = Math.round((wTop + wBottom) / 2);
-  const dstH = Math.round((hLeft + hRight) / 2);
-
-  // נקודות יעד (מרובע ישר)
-  const dst = [
-    { x: 0,    y: 0    },
-    { x: dstW, y: 0    },
-    { x: dstW, y: dstH },
-    { x: 0,    y: dstH },
+// מיישם perspective על ה-printFrame לפי ה-homography
+function applyFramePersp(){
+  if(!state.homography)return;
+  const frame=document.getElementById('printFrame');
+  const fw=state.frameW, fh=state.frameH;
+  // 4 פינות המסגרת במרחב המסך
+  const corners=[
+    {x:state.frameX,        y:state.frameY        },
+    {x:state.frameX+fw,     y:state.frameY        },
+    {x:state.frameX+fw,     y:state.frameY+fh     },
+    {x:state.frameX,        y:state.frameY+fh     },
   ];
-
-  // חשב homography H מ-src ל-dst
-  const H = computeHomography(src, dst);
-  if (!H) { skipPerspective(); return; }
-
-  // שמור homography ב-state לשימוש בציור הframe
-  state.homography = H;
-  state.perspSrc   = src;
-  state.perspDstW  = dstW;
-  state.perspDstH  = dstH;
-
-  document.getElementById('perspective-overlay').style.display = 'none';
-  document.getElementById('camControls').style.display = 'flex';
-  document.getElementById('printFrame').style.display  = 'flex';
-  initFrame();
-  updateHUD();
-}
-
-// DLT homography — 4 נקודות התאמה
-function computeHomography(src, dst) {
-  // בונה מטריצת A (8x9) ופותר SVD
-  const A = [];
-  for (let i = 0; i < 4; i++) {
-    const {x: sx, y: sy} = src[i];
-    const {x: dx, y: dy} = dst[i];
-    A.push([-sx,-sy,-1, 0,0,0, dx*sx, dx*sy, dx]);
-    A.push([ 0,0,0, -sx,-sy,-1, dy*sx, dy*sy, dy]);
-  }
-  // פתרון עם SVD מינימלי — נשתמש בשיטת pseudo-inverse דרך least-squares
-  // לאותה מטרה ב-JS טהור נשתמש ב-QR decomposition פשוטה
-  const h = solveHomLS(A);
-  if (!h) return null;
-  return [
-    [h[0],h[1],h[2]],
-    [h[3],h[4],h[5]],
-    [h[6],h[7],1]
-  ];
-}
-
-function solveHomLS(A) {
-  // Gaussian elimination על A^T * A * h = 0 עם constraint h[8]=1
-  // שיטה פשוטה: נסדר ל-8 משוואות עם h[8]=1 ידוע
-  const B = A.map(row => [...row.slice(0,8), -row[8]]);
-  // Gauss elimination
-  const n = 8;
-  const M = B.map(r => [...r]);
-  const b = B.map(r => r[8]);
-  // Build 8x8 normal equations A'A x = A'b
-  const AtA = Array.from({length:n}, () => new Array(n).fill(0));
-  const Atb = new Array(n).fill(0);
-  for (const row of A) {
-    for (let i = 0; i < n; i++) {
-      Atb[i] -= row[i] * row[8];
-      for (let j = 0; j < n; j++) AtA[i][j] += row[i] * row[j];
-    }
-  }
-  // Gauss elimination on AtA * x = Atb
-  for (let col = 0; col < n; col++) {
-    let maxRow = col;
-    for (let r = col+1; r < n; r++) if (Math.abs(AtA[r][col]) > Math.abs(AtA[maxRow][col])) maxRow = r;
-    [AtA[col], AtA[maxRow]] = [AtA[maxRow], AtA[col]];
-    [Atb[col], Atb[maxRow]] = [Atb[maxRow], Atb[col]];
-    if (Math.abs(AtA[col][col]) < 1e-10) return null;
-    const sc = AtA[col][col];
-    for (let j = col; j < n; j++) AtA[col][j] /= sc;
-    Atb[col] /= sc;
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-      const f = AtA[r][col];
-      for (let j = col; j < n; j++) AtA[r][j] -= f * AtA[col][j];
-      Atb[r] -= f * Atb[col];
-    }
-  }
-  return [...Atb, 1];
-}
-
-// החל homography על נקודה
-function applyH(H, x, y) {
-  const w = H[2][0]*x + H[2][1]*y + H[2][2];
-  return {
-    x: (H[0][0]*x + H[0][1]*y + H[0][2]) / w,
-    y: (H[1][0]*x + H[1][1]*y + H[1][2]) / w,
-  };
+  // החל H על כל פינה
+  const mapped=corners.map(p=>applyHom(state.homography,p.x,p.y));
+  // origin של הframe אחרי המיפוי
+  const orig=applyHom(state.homography,state.frameX,state.frameY);
+  // נקודות יחסיות לתוך המסגרת
+  const rel=mapped.map(p=>({x:p.x-orig.x,y:p.y-orig.y}));
+  const m=buildCSS3d(fw,fh,rel);
+  if(m) frame.style.transform=`matrix3d(${m})`;
 }
 
 // ====================================================
-// V1 — ציור frame עם perspective transform
-// ====================================================
-// override applyFrame כך שאם יש homography — משתמשים בו
-const _applyFrameOriginal = applyFrame;
-function applyFrame() {
-  _applyFrameOriginal();
-  if (state.homography) applyPerspToFrame();
-}
 
-function applyPerspToFrame() {
-  // חשב 4 פינות המסגרת במרחב המסך
-  const x0 = state.frameX, y0 = state.frameY;
-  const x1 = x0 + state.frameW, y1 = y0 + state.frameH;
-  const corners = [{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}];
-
-  // המר לקואורדינטות canvas (הפריים שנלכד)
-  const cw = persp.frameGrabbed?.width  || window.innerWidth;
-  const ch = persp.frameGrabbed?.height || window.innerHeight;
-  const sw = document.getElementById('camera-screen').clientWidth;
-  const sh = document.getElementById('camera-screen').clientHeight;
-  const sx = cw / sw, sy = ch / sh;
-
-  // החל homography הפוך (dst → src) לקבלת הנקודות על הקיר
-  // כאן H הוא src→dst, אז נצטרך H^-1 לבדוק איפה הפינות נופלות
-  // לצורך CSS transform, נחשב clip-path polygon עם הנקודות המשוכות
-  const Hinv = invertH(state.homography);
-  if (!Hinv) return;
-
-  // פינות ב-dst space
-  const dw = state.perspDstW, dh = state.perspDstH;
-  // מיפוי: המסגרת (בקואורדינטות מסך) → dst space → src space (מסך)
-  const ratio_x = dw / (state.frameW * sx);
-  const ratio_y = dh / (state.frameH * sy);
-
-  const mapped = corners.map(c => {
-    const dx = (c.x * sx / cw) * dw;
-    const dy = (c.y * sy / ch) * dh;
-    const sp = applyH(Hinv, dx, dy);
-    return { x: sp.x / sx, y: sp.y / sy };
-  });
-
-  // החל clip-path על frame
-  const frame = document.getElementById('printFrame');
-  const poly  = mapped.map(p => `${(p.x-state.frameX).toFixed(1)}px ${(p.y-state.frameY).toFixed(1)}px`).join(', ');
-
-  // שנה CSS transform ל-perspective skew
-  // הדרך הנכונה: CSS perspective transform matrix מ-4 נקודות
-  const cssMatrix = perspectiveCSSMatrix(
-    state.frameW, state.frameH,
-    mapped
-  );
-  if (cssMatrix) {
-    frame.style.transform = `matrix3d(${cssMatrix})`;
-  }
-}
-
-function invertH(H) {
-  const [[a,b,c],[d,e,f],[g,h,i]] = H;
-  const det = a*(e*i-f*h) - b*(d*i-f*g) + c*(d*h-e*g);
-  if (Math.abs(det) < 1e-10) return null;
-  const inv = [
-    [(e*i-f*h)/det, (c*h-b*i)/det, (b*f-c*e)/det],
-    [(f*g-d*i)/det, (a*i-c*g)/det, (c*d-a*f)/det],
-    [(d*h-e*g)/det, (b*g-a*h)/det, (a*e-b*d)/det],
-  ];
-  return inv;
-}
-
-// חישוב CSS matrix3d מ-4 נקודות יעד
-// src: מלבן (0,0,w,h) → dst: 4 נקודות произвольные
-function perspectiveCSSMatrix(w, h, dst) {
-  // src points
-  const s = [{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}];
-  const H = computeHomography(s, dst.map(p => ({x: p.x - state.frameX, y: p.y - state.frameY})));
-  if (!H) return null;
-  // CSS matrix3d (column-major, 4x4)
-  const [[h11,h12,h13],[h21,h22,h23],[h31,h32,h33]] = H;
-  return [
-    h11,  h21,  0, h31,
-    h12,  h22,  0, h32,
-    0,    0,    1, 0,
-    h13,  h23,  0, h33
-  ].map(v => v.toFixed(8)).join(',');
-}
-
-// ====================================================
 function setupDrag() {
   const frame  = document.getElementById('printFrame');
   const handle = document.getElementById('resizeHandle');
