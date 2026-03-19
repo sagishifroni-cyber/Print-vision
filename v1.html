@@ -390,20 +390,22 @@
 
   .print-frame {
     position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     cursor: move;
     pointer-events: all;
     touch-action: none;
     user-select: none;
+    overflow: hidden;  /* קריטי — מונע גלישת img מחוץ למסגרת */
   }
 
   .print-frame img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
+    pointer-events: none;
   }
 
   .frame-border {
@@ -795,7 +797,7 @@
 
   <!-- Perspective calibration overlay (V1) -->
   <div id="perspective-overlay" style="display:none; position:absolute; inset:0; z-index:12;">
-    <canvas id="perspCanvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+    <canvas id="perspCanvas" style="position:absolute; inset:0; width:100%; height:100%; touch-action:none; pointer-events:all;"></canvas>
     <div style="position:absolute; top:0; left:0; right:0; background:linear-gradient(to bottom,rgba(0,0,0,0.75),transparent); padding:1rem 1rem 2rem; display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
       <div style="font-family:'Space Mono',monospace; font-size:0.75rem; letter-spacing:0.2em; color:var(--accent);">PRINTVISION V1</div>
       <div style="font-size:1rem; font-weight:700; color:var(--text);">יישור לקיר</div>
@@ -1280,20 +1282,30 @@ const persp = { points:[], dragging:-1, snap:null };
 
 function startPerspectiveStep() {
   const video  = document.getElementById('video');
-  const canvas = document.getElementById('perspCanvas');
-  canvas.width  = video.clientWidth  || window.innerWidth;
-  canvas.height = video.clientHeight || window.innerHeight;
+  const camScreen = document.getElementById('camera-screen');
 
-  // snapshot לרקע
-  const snap = document.createElement('canvas');
-  snap.width = canvas.width; snap.height = canvas.height;
-  snap.getContext('2d').drawImage(video, 0, 0, snap.width, snap.height);
-  persp.snap = snap;
+  // השתמש בממדי המסך — לא הווידאו — כי אנחנו עובדים בקואורדינטות CSS
+  const W = camScreen.clientWidth  || window.innerWidth;
+  const H = camScreen.clientHeight || window.innerHeight;
+
+  const canvas = document.getElementById('perspCanvas');
+  canvas.width  = W;
+  canvas.height = H;
 
   document.getElementById('perspective-overlay').style.display = 'block';
-  persp.points = detectWallQuad(snap);
-  drawPerspCanvas();
-  setupPerspDrag();
+
+  // snapshot — חכה לrequestAnimationFrame כדי שהvideo יהיה מצויר
+  requestAnimationFrame(() => {
+    const snap = document.createElement('canvas');
+    snap.width = W; snap.height = H;
+    const sctx = snap.getContext('2d');
+    // צייר את הvideo בגודל מסך (לא רזולוציית וידאו)
+    sctx.drawImage(video, 0, 0, W, H);
+    persp.snap = snap;
+    persp.points = detectWallQuad(snap);
+    drawPerspCanvas();
+    setupPerspDrag();
+  });
 }
 
 function detectWallQuad(src) {
@@ -1352,8 +1364,14 @@ function detectWallQuad(src) {
     if(Math.abs(det)<1e-6) return {x:0,y:0};
     return {x:(l1.r*l2.s-l2.r*l1.s)/det, y:(l2.r*l1.c-l1.r*l2.c)/det};
   }
+  const PAD = Math.min(W, H) * 0.08; // שוליים מינימליים — 8% מהמסך
   const pts=[ix(h[0],v[0]),ix(h[0],v[1]),ix(h[1],v[1]),ix(h[1],v[0])]
-    .map(p=>({x:Math.max(20,Math.min(W-20,p.x/scale)),y:Math.max(20,Math.min(H-20,p.y/scale))}));
+    .map(p=>({x:p.x/scale, y:p.y/scale}));
+
+  // אם כל נקודה שהיא חורגת מהגבולות — fallback מיד
+  const inBounds = pts.every(p => p.x > PAD && p.x < W-PAD && p.y > PAD && p.y < H-PAD);
+  if (!inBounds) return defaultQuad(W, H);
+
   const area=Math.abs(pts[0].x*(pts[1].y-pts[3].y)+pts[1].x*(pts[2].y-pts[0].y)+pts[2].x*(pts[3].y-pts[1].y)+pts[3].x*(pts[0].y-pts[2].y))/2;
   return area>W*H*0.04 ? pts : defaultQuad(W,H);
 }
