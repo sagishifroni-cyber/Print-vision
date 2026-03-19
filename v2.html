@@ -1220,7 +1220,8 @@ function applyFrame() {
   frame.style.left   = state.frameX + 'px';
   frame.style.top    = state.frameY + 'px';
   if (state.homography) {
-    frame.style.transform = buildCSSMatrix(state.frameW, state.frameH, state.homography, state.frameX, state.frameY) || '';
+    const m = buildCSSMatrix(state.frameW, state.frameH, state.homography);
+    frame.style.transform = m || `rotate(${state.frameRotation}deg)`;
   } else {
     frame.style.transform = `rotate(${state.frameRotation}deg)`;
   }
@@ -1451,7 +1452,17 @@ function setupCornerDrag() {
   }
 
   const onDown  = e => { v2.dragging = nearest(pos(e)); drawCornerSvg(); e.preventDefault(); };
-  const onMove  = e => { if (v2.dragging < 0) return; v2.corners[v2.dragging] = clamp(pos(e)); drawCornerSvg(); e.preventDefault(); };
+  const onMove  = e => {
+    if (v2.dragging < 0) return;
+    v2.corners[v2.dragging] = clamp(pos(e));
+    drawCornerSvg();
+    // עדכון דינמי של התמונה בזמן גרירה
+    if (state.calibrated && document.getElementById('printFrame').style.display !== 'none') {
+      computeAndApplyHomography();
+      applyFrame();
+    }
+    e.preventDefault();
+  };
   const onUp    = () => { v2.dragging = -1; drawCornerSvg(); };
 
   svg.addEventListener('mousedown',  onDown);
@@ -1477,28 +1488,25 @@ function resetCorners() {
 }
 
 function confirmCorners() {
-  // חפץ הייחוס = מלבן ישר בגודל הידוע
-  const rw = state.refWidthMm  / 10 * state.pxPerCm;
-  const rh = state.refHeightMm / 10 * state.pxPerCm;
-
-  // src = פינות שזוהו במסך (עם perspective)
-  // dst = מלבן ישר של גודל חפץ הייחוס
-  const src = v2.corners;
-  const dst = [
-    { x: 0,  y: 0  },
-    { x: rw, y: 0  },
-    { x: rw, y: rh },
-    { x: 0,  y: rh },
-  ];
-
-  state.homography = computeHomography(src, dst);
-  state.refCorners = [...src];
-
+  computeAndApplyHomography();
   document.getElementById('corner-overlay').style.display = 'none';
   document.getElementById('camControls').style.display = 'flex';
   document.getElementById('printFrame').style.display  = 'flex';
   initFrame();
   updateHUD();
+}
+
+function computeAndApplyHomography() {
+  // H ממפה: פינות חפץ הייחוס (במסך, מעוות) → מלבן ישר
+  // dst = מלבן יחידה (0..1, 0..1) — לא תלוי בגודל
+  const src = v2.corners;
+  const dst = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+  ];
+  state.homography = computeHomography(src, dst);
 }
 
 function skipCorners() {
@@ -1553,40 +1561,43 @@ function applyHom(H, x, y) {
            y: (H[1][0]*x + H[1][1]*y + H[1][2]) / w };
 }
 
-// בונה CSS matrix3d מ-homography
-// ממפה מלבן (0,0,fw,fh) → 4 נקודות מסך
-function buildCSSMatrix(fw, fh, H, ox, oy) {
-  // 4 פינות המסגרת במרחב ה-dst (מלבן ישר)
-  const rw = state.refWidthMm  / 10 * state.pxPerCm;
-  const rh = state.refHeightMm / 10 * state.pxPerCm;
-  // מפה: פינת המסגרת → dst → src (מסך)
-  // H הוא src→dst, אז נצטרך H^-1
-  const Hi = invertH(H);
-  if (!Hi) return null;
-
-  const corners = [
-    { x: ox,    y: oy    },
-    { x: ox+fw, y: oy    },
-    { x: ox+fw, y: oy+fh },
-    { x: ox,    y: oy+fh },
+// buildCSSMatrix — מחיל את ה-perspective של חפץ הייחוס על ה-frame
+// H ממפה: נקודת מסך → מרחב ישר (0..1, 0..1)
+// לוקחים 4 פינות ה-frame, ממירים דרך H, ומחשבים CSS matrix3d
+// שממפה את המלבן (0,0,fw,fh) לפינות המוזזות — כך הגודל נשמר
+function buildCSSMatrix(fw, fh, H) {
+  // 4 פינות ה-frame במסך
+  const screenCorners = [
+    { x: state.frameX,       y: state.frameY       },
+    { x: state.frameX + fw,  y: state.frameY       },
+    { x: state.frameX + fw,  y: state.frameY + fh  },
+    { x: state.frameX,       y: state.frameY + fh  },
   ];
 
-  // המר כל פינה: מסך → dst → scale לגודל frame
-  const dst = corners.map(p => {
-    const d = applyHom(H, p.x, p.y);
-    return { x: d.x / rw * fw, y: d.y / rh * fh };
-  });
+  // החל H על כל פינה → קואורדינטות "ישרות" (0..1)
+  const mapped = screenCorners.map(p => applyHom(H, p.x, p.y));
 
-  // origin
-  const orig = dst[0];
-  const rel  = dst.map(p => ({ x: p.x - orig.x, y: p.y - orig.y }));
+  // מצא bbox של ה-mapped points כדי לדעת את הסקאל
+  const minX = Math.min(...mapped.map(p => p.x));
+  const minY = Math.min(...mapped.map(p => p.y));
+  const maxX = Math.max(...mapped.map(p => p.x));
+  const maxY = Math.max(...mapped.map(p => p.y));
+  const spanX = maxX - minX || 1;
+  const spanY = maxY - minY || 1;
 
-  // בנה CSS homography ממלבן → rel points
+  // נרמל לקואורדינטות יחסיות לתוך ה-frame (0..fw, 0..fh)
+  const rel = mapped.map(p => ({
+    x: (p.x - minX) / spanX * fw,
+    y: (p.y - minY) / spanY * fh,
+  }));
+
+  // בנה CSS homography: מלבן ישר (0,0,fw,fh) → rel points
   const srcPts = [{x:0,y:0},{x:fw,y:0},{x:fw,y:fh},{x:0,y:fh}];
   const Hcss = computeHomography(srcPts, rel);
   if (!Hcss) return null;
-  const [[a,b,c],[d,e,f],[g,h,i]] = Hcss;
-  return `matrix3d(${[a,d,0,g, b,e,0,h, 0,0,1,0, c,f,0,i].map(v=>v.toFixed(8)).join(',')})`;
+  const [[a,b,c],[d,e,f],[g,h,ii]] = Hcss;
+  // CSS matrix3d (column-major, 4x4)
+  return `matrix3d(${[a,d,0,g, b,e,0,h, 0,0,1,0, c,f,0,ii].map(v=>v.toFixed(8)).join(',')})`;
 }
 
 function invertH(H) {
