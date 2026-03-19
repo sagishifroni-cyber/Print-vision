@@ -808,7 +808,7 @@
 
   <!-- V2: Corner confirmation overlay -->
   <div id="corner-overlay" style="display:none; position:absolute; inset:0; z-index:15;">
-    <svg id="cornerSvg" style="position:absolute; inset:0; width:100%; height:100%; touch-action:none; overflow:visible;">
+    <svg id="cornerSvg" style="position:absolute; inset:0; width:100%; height:100%; touch-action:none; overflow:visible; pointer-events:all;">
       <polygon id="cornerPoly" points="" fill="rgba(122,232,160,0.10)" stroke="rgba(122,232,160,0.85)" stroke-width="2" stroke-dasharray="6,3"/>
       <circle id="cc0" r="22" stroke="white" stroke-width="2.5"/>
       <text id="ct0" text-anchor="middle" dominant-baseline="middle" fill="#0d0d0f" font-size="12" font-weight="bold">1</text>
@@ -1412,12 +1412,29 @@ function drawCornerSvg() {
 
 function setupCornerDrag() {
   const svg = document.getElementById('cornerSvg');
+
+  // הוסף rect שקוף שמכסה את כל ה-SVG כדי לקלוט events גם על הרקע
+  let bg = svg.querySelector('.drag-bg');
+  if (!bg) {
+    bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('class', 'drag-bg');
+    bg.setAttribute('width',  '100%');
+    bg.setAttribute('height', '100%');
+    bg.setAttribute('fill',   'transparent');
+    svg.insertBefore(bg, svg.firstChild);
+  }
+
+  // הסר listeners קודמים על ידי שמירת reference
+  if (svg._dragCleanup) svg._dragCleanup();
+
   function pos(e) {
-    const r = svg.getBoundingClientRect(), sc = e.touches ? e.touches[0] : e;
+    const r  = svg.getBoundingClientRect();
+    const sc = e.touches ? e.touches[0] : e;
     return { x: sc.clientX - r.left, y: sc.clientY - r.top };
   }
+
   function nearest(pt) {
-    const R = Math.min(svg.clientWidth, svg.clientHeight) * 0.12;
+    const R = Math.min(svg.clientWidth, svg.clientHeight) * 0.15; // רדיוס לכידה גדול
     let best = -1, bestD = R;
     v2.corners.forEach((p, i) => {
       const d = Math.hypot(p.x - pt.x, p.y - pt.y);
@@ -1425,22 +1442,33 @@ function setupCornerDrag() {
     });
     return best;
   }
+
   function clamp(pt) {
     return {
       x: Math.max(5, Math.min(svg.clientWidth  - 5, pt.x)),
       y: Math.max(5, Math.min(svg.clientHeight - 5, pt.y)),
     };
   }
-  // מנקה listeners קודמים
-  const ns = svg.cloneNode(true);
-  svg.parentNode.replaceChild(ns, svg);
-  const svgNew = document.getElementById('cornerSvg');
-  svgNew.addEventListener('mousedown',  e => { v2.dragging = nearest(pos(e)); drawCornerSvg(); e.preventDefault(); });
-  svgNew.addEventListener('touchstart', e => { v2.dragging = nearest(pos(e)); drawCornerSvg(); e.preventDefault(); }, { passive: false });
-  svgNew.addEventListener('mousemove',  e => { if (v2.dragging < 0) return; v2.corners[v2.dragging] = clamp(pos(e)); drawCornerSvg(); e.preventDefault(); });
-  svgNew.addEventListener('touchmove',  e => { if (v2.dragging < 0) return; v2.corners[v2.dragging] = clamp(pos(e)); drawCornerSvg(); e.preventDefault(); }, { passive: false });
-  svgNew.addEventListener('mouseup',    () => { v2.dragging = -1; drawCornerSvg(); });
-  svgNew.addEventListener('touchend',   () => { v2.dragging = -1; drawCornerSvg(); });
+
+  const onDown  = e => { v2.dragging = nearest(pos(e)); drawCornerSvg(); e.preventDefault(); };
+  const onMove  = e => { if (v2.dragging < 0) return; v2.corners[v2.dragging] = clamp(pos(e)); drawCornerSvg(); e.preventDefault(); };
+  const onUp    = () => { v2.dragging = -1; drawCornerSvg(); };
+
+  svg.addEventListener('mousedown',  onDown);
+  svg.addEventListener('touchstart', onDown, { passive: false });
+  svg.addEventListener('mousemove',  onMove);
+  svg.addEventListener('touchmove',  onMove, { passive: false });
+  svg.addEventListener('mouseup',    onUp);
+  svg.addEventListener('touchend',   onUp);
+
+  svg._dragCleanup = () => {
+    svg.removeEventListener('mousedown',  onDown);
+    svg.removeEventListener('touchstart', onDown);
+    svg.removeEventListener('mousemove',  onMove);
+    svg.removeEventListener('touchmove',  onMove);
+    svg.removeEventListener('mouseup',    onUp);
+    svg.removeEventListener('touchend',   onUp);
+  };
 }
 
 function resetCorners() {
