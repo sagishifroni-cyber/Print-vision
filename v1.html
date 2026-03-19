@@ -797,13 +797,24 @@
 
   <!-- Perspective calibration overlay (V1) -->
   <div id="perspective-overlay" style="display:none; position:absolute; inset:0; z-index:12;">
-    <canvas id="perspCanvas" style="position:absolute; inset:0; width:100%; height:100%; touch-action:none; pointer-events:all;"></canvas>
-    <div style="position:absolute; top:0; left:0; right:0; background:linear-gradient(to bottom,rgba(0,0,0,0.75),transparent); padding:1rem 1rem 2rem; display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
-      <div style="font-family:'Space Mono',monospace; font-size:0.75rem; letter-spacing:0.2em; color:var(--accent);">PRINTVISION V1</div>
+    <!-- SVG שקוף על גבי הוידאו החי — ללא canvas שמסתיר -->
+    <svg id="perspSvg" style="position:absolute; inset:0; width:100%; height:100%; touch-action:none;" xmlns="http://www.w3.org/2000/svg">
+      <polygon id="perspPoly" points="" fill="rgba(122,201,232,0.10)" stroke="rgba(122,201,232,0.85)" stroke-width="2"/>
+      <circle id="pc0" r="22" fill="#7ac9e8" stroke="white" stroke-width="2.5"/>
+      <text id="pt0" text-anchor="middle" dominant-baseline="middle" fill="#0d0d0f" font-size="13" font-weight="bold">1</text>
+      <circle id="pc1" r="22" fill="#7ac9e8" stroke="white" stroke-width="2.5"/>
+      <text id="pt1" text-anchor="middle" dominant-baseline="middle" fill="#0d0d0f" font-size="13" font-weight="bold">2</text>
+      <circle id="pc2" r="22" fill="#7ac9e8" stroke="white" stroke-width="2.5"/>
+      <text id="pt2" text-anchor="middle" dominant-baseline="middle" fill="#0d0d0f" font-size="13" font-weight="bold">3</text>
+      <circle id="pc3" r="22" fill="#7ac9e8" stroke="white" stroke-width="2.5"/>
+      <text id="pt3" text-anchor="middle" dominant-baseline="middle" fill="#0d0d0f" font-size="13" font-weight="bold">4</text>
+    </svg>
+    <div style="position:absolute; top:0; left:0; right:0; background:linear-gradient(to bottom,rgba(0,0,0,0.72),transparent); padding:1rem 1rem 2.5rem; display:flex; flex-direction:column; gap:0.4rem; align-items:center; pointer-events:none;">
+      <div style="font-family:'Space Mono',monospace; font-size:0.72rem; letter-spacing:0.2em; color:var(--accent);">PRINTVISION V1</div>
       <div style="font-size:1rem; font-weight:700; color:var(--text);">יישור לקיר</div>
-      <div style="font-size:0.82rem; color:var(--text-muted); text-align:center; line-height:1.5;">גרור את 4 הנקודות הכחולות לפינות הקיר. התמונה תתאים את עצמה.</div>
+      <div style="font-size:0.8rem; color:var(--text-muted); text-align:center; line-height:1.5; max-width:280px;">גרור את 4 הנקודות לפינות המרובע הישר שעל הקיר</div>
     </div>
-    <div style="position:absolute; bottom:0; left:0; right:0; padding:1rem 1.5rem 2rem; background:linear-gradient(to top,rgba(0,0,0,0.85),transparent); display:flex; gap:0.6rem;">
+    <div style="position:absolute; bottom:0; left:0; right:0; padding:1rem 1.5rem 2rem; background:linear-gradient(to top,rgba(0,0,0,0.82),transparent); display:flex; gap:0.6rem;">
       <button class="cam-btn secondary" style="flex:0.7;" onclick="skipPerspective()">דלג ←</button>
       <button class="cam-btn secondary" onclick="resetPerspPoints()">↺ אפס</button>
       <button class="cam-btn primary" onclick="applyPerspective()">✓ יישר והמשך</button>
@@ -1278,107 +1289,73 @@ function rotateImageFrame() {
 // הגודל נשמר לפי pxPerCm מהכיול.
 // ====================================================
 
-const persp = { points:[], dragging:-1, snap:null };
+const persp = { points:[], dragging:-1 };
 
 function startPerspectiveStep() {
-  const video  = document.getElementById('video');
   const camScreen = document.getElementById('camera-screen');
-
-  // השתמש בממדי המסך — לא הווידאו — כי אנחנו עובדים בקואורדינטות CSS
   const W = camScreen.clientWidth  || window.innerWidth;
   const H = camScreen.clientHeight || window.innerHeight;
-
-  const canvas = document.getElementById('perspCanvas');
-  canvas.width  = W;
-  canvas.height = H;
-
   document.getElementById('perspective-overlay').style.display = 'block';
-
-  // snapshot — חכה לrequestAnimationFrame כדי שהvideo יהיה מצויר
-  requestAnimationFrame(() => {
-    const snap = document.createElement('canvas');
-    snap.width = W; snap.height = H;
-    const sctx = snap.getContext('2d');
-    // צייר את הvideo בגודל מסך (לא רזולוציית וידאו)
-    sctx.drawImage(video, 0, 0, W, H);
-    persp.snap = snap;
-    persp.points = detectWallQuad(snap);
-    drawPerspCanvas();
-    setupPerspDrag();
-  });
+  persp.points = detectWallQuad(W, H);
+  drawPerspSvg();
+  setupPerspDrag();
 }
 
-function detectWallQuad(src) {
-  const W = src.width, H = src.height;
+function detectWallQuad(W, H) {
+  const video = document.getElementById('video');
   const scale = Math.min(1, 400 / Math.max(W, H));
   const sw = Math.round(W*scale), sh = Math.round(H*scale);
   const tmp = document.createElement('canvas');
   tmp.width = sw; tmp.height = sh;
-  tmp.getContext('2d').drawImage(src, 0, 0, sw, sh);
+  tmp.getContext('2d').drawImage(video, 0, 0, sw, sh);
   const data = tmp.getContext('2d').getImageData(0, 0, sw, sh).data;
-
   const gray = new Float32Array(sw*sh);
-  for (let i = 0; i < sw*sh; i++)
-    gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
-
-  const edges = new Float32Array(sw*sh);
-  let maxE = 0;
-  for (let y=1;y<sh-1;y++) for (let x=1;x<sw-1;x++) {
-    const gx = -gray[(y-1)*sw+x-1]+gray[(y-1)*sw+x+1]-2*gray[y*sw+x-1]+2*gray[y*sw+x+1]-gray[(y+1)*sw+x-1]+gray[(y+1)*sw+x+1];
-    const gy = -gray[(y-1)*sw+x-1]-2*gray[(y-1)*sw+x]-gray[(y-1)*sw+x+1]+gray[(y+1)*sw+x-1]+2*gray[(y+1)*sw+x]+gray[(y+1)*sw+x+1];
-    edges[y*sw+x] = Math.sqrt(gx*gx+gy*gy);
-    if (edges[y*sw+x]>maxE) maxE=edges[y*sw+x];
+  for(let i=0;i<sw*sh;i++) gray[i]=0.299*data[i*4]+0.587*data[i*4+1]+0.114*data[i*4+2];
+  const edges=new Float32Array(sw*sh); let maxE=0;
+  for(let y=1;y<sh-1;y++) for(let x=1;x<sw-1;x++){
+    const gx=-gray[(y-1)*sw+x-1]+gray[(y-1)*sw+x+1]-2*gray[y*sw+x-1]+2*gray[y*sw+x+1]-gray[(y+1)*sw+x-1]+gray[(y+1)*sw+x+1];
+    const gy=-gray[(y-1)*sw+x-1]-2*gray[(y-1)*sw+x]-gray[(y-1)*sw+x+1]+gray[(y+1)*sw+x-1]+2*gray[(y+1)*sw+x]+gray[(y+1)*sw+x+1];
+    edges[y*sw+x]=Math.sqrt(gx*gx+gy*gy); if(edges[y*sw+x]>maxE)maxE=edges[y*sw+x];
   }
-  const thresh = new Uint8Array(sw*sh);
-  const T = maxE*0.20;
-  for (let i=0;i<edges.length;i++) thresh[i]=edges[i]>T?1:0;
-
-  const diag=Math.ceil(Math.sqrt(sw*sw+sh*sh)), nT=180, nR=diag*2;
+  const thresh=new Uint8Array(sw*sh); const T=maxE*0.20;
+  for(let i=0;i<edges.length;i++) thresh[i]=edges[i]>T?1:0;
+  const diag=Math.ceil(Math.sqrt(sw*sw+sh*sh)),nT=180,nR=diag*2;
   const acc=new Int32Array(nT*nR);
-  const cosA=new Float32Array(nT), sinA=new Float32Array(nT);
-  for (let t=0;t<nT;t++){cosA[t]=Math.cos(t*Math.PI/nT);sinA[t]=Math.sin(t*Math.PI/nT);}
-  for (let y=0;y<sh;y++) for (let x=0;x<sw;x++) {
-    if (!thresh[y*sw+x]) continue;
-    for (let t=0;t<nT;t++){const r=Math.round(x*cosA[t]+y*sinA[t])+diag;if(r>=0&&r<nR)acc[t*nR+r]++;}
+  const cosA=new Float32Array(nT),sinA=new Float32Array(nT);
+  for(let t=0;t<nT;t++){cosA[t]=Math.cos(t*Math.PI/nT);sinA[t]=Math.sin(t*Math.PI/nT);}
+  for(let y=0;y<sh;y++) for(let x=0;x<sw;x++){
+    if(!thresh[y*sw+x])continue;
+    for(let t=0;t<nT;t++){const r=Math.round(x*cosA[t]+y*sinA[t])+diag;if(r>=0&&r<nR)acc[t*nR+r]++;}
   }
-  const minV = Math.max(20, sw*0.12);
-  const lines=[];
-  for (let t=0;t<nT;t++) for (let r=1;r<nR-1;r++){
-    const v=acc[t*nR+r]; if(v<minV) continue;
+  const minV=Math.max(20,sw*0.12); const lines=[];
+  for(let t=0;t<nT;t++) for(let r=1;r<nR-1;r++){
+    const v=acc[t*nR+r]; if(v<minV)continue;
     let ok=true;
-    outer: for(let dt=-3;dt<=3;dt++) for(let dr=-3;dr<=3;dr++){
+    outer:for(let dt=-3;dt<=3;dt++) for(let dr=-3;dr<=3;dr++){
       if(!dt&&!dr)continue; const nt=(t+dt+nT)%nT,nr=r+dr;
       if(nr>=0&&nr<nR&&acc[nt*nR+nr]>=v){ok=false;break outer;}
     }
-    if(ok) lines.push({t,r:r-diag,v,theta:t*Math.PI/nT,c:cosA[t],s:sinA[t]});
+    if(ok)lines.push({t,r:r-diag,v,c:cosA[t],s:sinA[t]});
   }
   lines.sort((a,b)=>b.v-a.v);
-
   const horiz=lines.filter(l=>l.t<30||l.t>150).slice(0,6);
   const vert =lines.filter(l=>l.t>=60&&l.t<=120).slice(0,6);
   const h=pickPair(horiz,sh), v=pickPair(vert,sw);
   if(!h||!v) return defaultQuad(W,H);
-
   function ix(l1,l2){
-    const det=l1.c*l2.s-l2.c*l1.s;
-    if(Math.abs(det)<1e-6) return {x:0,y:0};
-    return {x:(l1.r*l2.s-l2.r*l1.s)/det, y:(l2.r*l1.c-l1.r*l2.c)/det};
+    const det=l1.c*l2.s-l2.c*l1.s; if(Math.abs(det)<1e-6)return{x:0,y:0};
+    return{x:(l1.r*l2.s-l2.r*l1.s)/det,y:(l2.r*l1.c-l1.r*l2.c)/det};
   }
-  const PAD = Math.min(W, H) * 0.08; // שוליים מינימליים — 8% מהמסך
-  const pts=[ix(h[0],v[0]),ix(h[0],v[1]),ix(h[1],v[1]),ix(h[1],v[0])]
-    .map(p=>({x:p.x/scale, y:p.y/scale}));
-
-  // אם כל נקודה שהיא חורגת מהגבולות — fallback מיד
-  const inBounds = pts.every(p => p.x > PAD && p.x < W-PAD && p.y > PAD && p.y < H-PAD);
-  if (!inBounds) return defaultQuad(W, H);
-
+  const PAD=Math.min(W,H)*0.08;
+  const pts=[ix(h[0],v[0]),ix(h[0],v[1]),ix(h[1],v[1]),ix(h[1],v[0])].map(p=>({x:p.x/scale,y:p.y/scale}));
+  if(pts.some(p=>p.x<PAD||p.x>W-PAD||p.y<PAD||p.y>H-PAD)) return defaultQuad(W,H);
   const area=Math.abs(pts[0].x*(pts[1].y-pts[3].y)+pts[1].x*(pts[2].y-pts[0].y)+pts[2].x*(pts[3].y-pts[1].y)+pts[3].x*(pts[0].y-pts[2].y))/2;
-  return area>W*H*0.04 ? pts : defaultQuad(W,H);
+  return area>W*H*0.04?pts:defaultQuad(W,H);
 }
 
 function pickPair(lines,dim){
   for(let i=0;i<lines.length;i++) for(let j=i+1;j<lines.length;j++)
-    if(Math.abs(lines[i].r-lines[j].r)>dim*0.15) return [lines[i],lines[j]];
+    if(Math.abs(lines[i].r-lines[j].r)>dim*0.15) return[lines[i],lines[j]];
   return null;
 }
 
@@ -1387,55 +1364,42 @@ function defaultQuad(W,H){
   return [{x:mx,y:my},{x:W-mx,y:my},{x:W-mx,y:H-my},{x:mx,y:H-my}];
 }
 
-function drawPerspCanvas(){
-  const canvas=document.getElementById('perspCanvas');
-  const ctx=canvas.getContext('2d');
-  const W=canvas.width,H=canvas.height;
-  ctx.drawImage(persp.snap,0,0,W,H);
-  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(0,0,W,H);
-  const pts=persp.points; if(pts.length<4) return;
-  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath();
-  ctx.fillStyle='rgba(122,201,232,0.12)'; ctx.fill();
-  ctx.strokeStyle='rgba(122,201,232,0.9)'; ctx.lineWidth=2; ctx.stroke();
-  const TOUCH_R=Math.round(Math.min(W,H)*0.07);
+function drawPerspSvg(){
+  const pts=persp.points; if(pts.length<4)return;
+  document.getElementById('perspPoly').setAttribute('points',pts.map(p=>`${p.x},${p.y}`).join(' '));
   pts.forEach((p,i)=>{
-    // אזור גרירה גדול (שקוף)
-    ctx.beginPath(); ctx.arc(p.x,p.y,TOUCH_R,0,Math.PI*2);
-    ctx.fillStyle=i===persp.dragging?'rgba(232,201,122,0.2)':'rgba(122,201,232,0.1)'; ctx.fill();
-    // נקודה נראית
-    ctx.beginPath(); ctx.arc(p.x,p.y,16,0,Math.PI*2);
-    ctx.fillStyle=i===persp.dragging?'#e8c97a':'#7ac9e8';
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#0d0d0f'; ctx.font='bold 13px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(i+1,p.x,p.y);
+    document.getElementById(`pc${i}`).setAttribute('cx',p.x);
+    document.getElementById(`pc${i}`).setAttribute('cy',p.y);
+    document.getElementById(`pt${i}`).setAttribute('x',p.x);
+    document.getElementById(`pt${i}`).setAttribute('y',p.y);
+    document.getElementById(`pc${i}`).setAttribute('fill',i===persp.dragging?'#e8c97a':'#7ac9e8');
   });
 }
 
 function setupPerspDrag(){
-  const canvas=document.getElementById('perspCanvas');
+  const svg=document.getElementById('perspSvg');
   function pos(e){
-    const r=canvas.getBoundingClientRect(), sc=e.touches?e.touches[0]:e;
-    return {x:(sc.clientX-r.left)*(canvas.width/r.width), y:(sc.clientY-r.top)*(canvas.height/r.height)};
+    const r=svg.getBoundingClientRect(),sc=e.touches?e.touches[0]:e;
+    return{x:sc.clientX-r.left,y:sc.clientY-r.top};
   }
   function nearest(pt){
-    const R=Math.min(canvas.width,canvas.height)*0.1;
+    const R=Math.min(svg.clientWidth,svg.clientHeight)*0.12;
     let best=-1,bestD=R;
     persp.points.forEach((p,i)=>{const d=Math.hypot(p.x-pt.x,p.y-pt.y);if(d<bestD){bestD=d;best=i;}});
     return best;
   }
-  function clamp(pt){return {x:Math.max(10,Math.min(canvas.width-10,pt.x)),y:Math.max(10,Math.min(canvas.height-10,pt.y))};}
-  canvas.addEventListener('mousedown', e=>{persp.dragging=nearest(pos(e));e.preventDefault();});
-  canvas.addEventListener('touchstart',e=>{persp.dragging=nearest(pos(e));e.preventDefault();},{passive:false});
-  canvas.addEventListener('mousemove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspCanvas();e.preventDefault();});
-  canvas.addEventListener('touchmove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspCanvas();e.preventDefault();},{passive:false});
-  canvas.addEventListener('mouseup',  ()=>{persp.dragging=-1;});
-  canvas.addEventListener('touchend', ()=>{persp.dragging=-1;});
+  function clamp(pt){return{x:Math.max(10,Math.min(svg.clientWidth-10,pt.x)),y:Math.max(10,Math.min(svg.clientHeight-10,pt.y))};}
+  svg.addEventListener('mousedown', e=>{persp.dragging=nearest(pos(e));drawPerspSvg();e.preventDefault();});
+  svg.addEventListener('touchstart',e=>{persp.dragging=nearest(pos(e));drawPerspSvg();e.preventDefault();},{passive:false});
+  svg.addEventListener('mousemove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspSvg();e.preventDefault();});
+  svg.addEventListener('touchmove', e=>{if(persp.dragging<0)return;persp.points[persp.dragging]=clamp(pos(e));drawPerspSvg();e.preventDefault();},{passive:false});
+  svg.addEventListener('mouseup',  ()=>{persp.dragging=-1;drawPerspSvg();});
+  svg.addEventListener('touchend', ()=>{persp.dragging=-1;drawPerspSvg();});
 }
 
 function resetPerspPoints(){
-  const c=document.getElementById('perspCanvas');
-  persp.points=defaultQuad(c.width,c.height); drawPerspCanvas();
+  const svg=document.getElementById('perspSvg');
+  persp.points=defaultQuad(svg.clientWidth,svg.clientHeight); drawPerspSvg();
 }
 
 function skipPerspective(){
@@ -1466,29 +1430,24 @@ function computeHomography(src,dst){
     A.push([-sx,-sy,-1,0,0,0,dx*sx,dx*sy,dx]);
     A.push([0,0,0,-sx,-sy,-1,dy*sx,dy*sy,dy]);
   }
-  const n=8;
-  const AtA=Array.from({length:n},()=>new Float64Array(n));
-  const Atb=new Float64Array(n);
-  for(const row of A){
-    for(let i=0;i<n;i++){Atb[i]-=row[i]*row[8];for(let j=0;j<n;j++)AtA[i][j]+=row[i]*row[j];}
-  }
+  const n=8,AtA=Array.from({length:n},()=>new Float64Array(n)),Atb=new Float64Array(n);
+  for(const row of A){for(let i=0;i<n;i++){Atb[i]-=row[i]*row[8];for(let j=0;j<n;j++)AtA[i][j]+=row[i]*row[j];}}
   for(let c=0;c<n;c++){
     let mr=c; for(let r=c+1;r<n;r++) if(Math.abs(AtA[r][c])>Math.abs(AtA[mr][c]))mr=r;
-    [AtA[c],AtA[mr]]=[AtA[mr],AtA[c]]; [Atb[c],Atb[mr]]=[Atb[mr],Atb[c]];
+    [AtA[c],AtA[mr]]=[AtA[mr],AtA[c]];[Atb[c],Atb[mr]]=[Atb[mr],Atb[c]];
     if(Math.abs(AtA[c][c])<1e-12)return null;
     const s=AtA[c][c]; for(let j=c;j<n;j++)AtA[c][j]/=s; Atb[c]/=s;
     for(let r=0;r<n;r++){if(r===c)continue;const f=AtA[r][c];for(let j=c;j<n;j++)AtA[r][j]-=f*AtA[c][j];Atb[r]-=f*Atb[c];}
   }
   const h=[...Atb,1];
-  return [[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],h[8]]];
+  return[[h[0],h[1],h[2]],[h[3],h[4],h[5]],[h[6],h[7],h[8]]];
 }
 
 function applyHom(H,x,y){
   const w=H[2][0]*x+H[2][1]*y+H[2][2];
-  return{x:(H[0][0]*x+H[0][1]*y+H[0][2])/w, y:(H[1][0]*x+H[1][1]*y+H[1][2])/w};
+  return{x:(H[0][0]*x+H[0][1]*y+H[0][2])/w,y:(H[1][0]*x+H[1][1]*y+H[1][2])/w};
 }
 
-// בונה CSS matrix3d מ-src מלבן (0,0,fw,fh) → dst 4 נקודות
 function buildCSS3d(fw,fh,dst){
   const src=[{x:0,y:0},{x:fw,y:0},{x:fw,y:fh},{x:0,y:fh}];
   const H=computeHomography(src,dst); if(!H)return null;
@@ -1496,26 +1455,18 @@ function buildCSS3d(fw,fh,dst){
   return[a,d,0,g,b,e,0,h,0,0,1,0,c,f,0,i].map(v=>v.toFixed(8)).join(',');
 }
 
-// מיישם perspective על ה-printFrame לפי ה-homography
 function applyFramePersp(){
   if(!state.homography)return;
   const frame=document.getElementById('printFrame');
-  const fw=state.frameW, fh=state.frameH;
-  // 4 פינות המסגרת במרחב המסך
+  const fw=state.frameW,fh=state.frameH;
   const corners=[
-    {x:state.frameX,        y:state.frameY        },
-    {x:state.frameX+fw,     y:state.frameY        },
-    {x:state.frameX+fw,     y:state.frameY+fh     },
-    {x:state.frameX,        y:state.frameY+fh     },
+    {x:state.frameX,y:state.frameY},{x:state.frameX+fw,y:state.frameY},
+    {x:state.frameX+fw,y:state.frameY+fh},{x:state.frameX,y:state.frameY+fh},
   ];
-  // החל H על כל פינה
   const mapped=corners.map(p=>applyHom(state.homography,p.x,p.y));
-  // origin של הframe אחרי המיפוי
   const orig=applyHom(state.homography,state.frameX,state.frameY);
-  // נקודות יחסיות לתוך המסגרת
   const rel=mapped.map(p=>({x:p.x-orig.x,y:p.y-orig.y}));
-  const m=buildCSS3d(fw,fh,rel);
-  if(m) frame.style.transform=`matrix3d(${m})`;
+  const m=buildCSS3d(fw,fh,rel); if(m)frame.style.transform=`matrix3d(${m})`;
 }
 
 // ====================================================
